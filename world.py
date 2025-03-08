@@ -1,10 +1,11 @@
 
 import csv
 import pygame
-from soldier import Soldier, ItemBox
+from soldier import Player, Enemy
+from weapons import ItemBox                                       # type: ignore
 from settings import WHITE, RED, GREEN   
 from settings import ROWS, COLS, TILE_SIZE, TILE_TYPES            # type: ignore
-
+from settings import GRAVITY, Direction
 
 class HealthBar():
     def __init__(self, x, y, cur_health, max_health, width=150, height=20):
@@ -24,17 +25,17 @@ class HealthBar():
 class World():
     def __init__(self):
         self._tile_img_list = []
-        self._obstacle_list = []
         self._player = None
         self._health_bar = None
+        self._obstacle_group = pygame.sprite.Group()
+        self._water_group = pygame.sprite.Group()
+        self._decoration_group = pygame.sprite.Group()
+        self._exit_group = pygame.sprite.Group()
         self._item_group = pygame.sprite.Group()
         self._enemy_group = pygame.sprite.Group()
         self._bullet_group = pygame.sprite.Group()
         self._grenade_group = pygame.sprite.Group()
         self._explosion_group = pygame.sprite.Group()
-        self._water_group = pygame.sprite.Group()
-        self._decoration_group = pygame.sprite.Group()
-        self._exit_group = pygame.sprite.Group()
 
         for tile_num in range(TILE_TYPES):
             img = pygame.image.load(f'img/tile/{tile_num}.png')
@@ -71,11 +72,15 @@ class World():
 
     @property
     def obstacles(self):
-        return self._obstacle_list
+        return self._obstacle_group
     
     @property
     def decoration_group(self):
         return self._decoration_group
+    
+    @property
+    def obstacle_group(self):
+        return self._obstacle_group
 
     @property
     def water_group(self):
@@ -107,10 +112,11 @@ class World():
                     rect = img.get_rect()
                     rect.x = x * TILE_SIZE
                     rect.y = y * TILE_SIZE
-                    tile_data = (img, rect)
+                    #tile_data = (img, rect)
 
                     if tile < 9: # TODO: 9 is a magic number because 0-8 are dirt tiles
-                        self._obstacle_list.append(tile_data)
+                        obstacle_tile = Obstacle(img, rect.x, rect.y)
+                        self._obstacle_group.add(obstacle_tile)
                     elif tile < 11:
                         water_tile = Water(img, rect.x, rect.y)
                         self._water_group.add(water_tile)
@@ -118,11 +124,11 @@ class World():
                         decoration_tile = Decoration(img, rect.x, rect.y)
                         self._decoration_group.add(decoration_tile)
                     elif tile == 15:
-                        self._player = Soldier(rect.x, rect.y, 'player', 1.65)
+                        self._player = Player(rect.x, rect.y, 'player', 1.65)
                         self._health_bar = HealthBar(10, 10, self._player.health, self._player.max_health)
                         print(f"Player 1 loaded at location ({x},{y})")
                     elif tile == 16:
-                        enemy = Soldier(rect.x, rect.y, 'enemy', 1.65, 2)
+                        enemy = Enemy(rect.x, rect.y, 'enemy', 1.65, 2)
                         self._enemy_group.add(enemy)
                         print(f"Enemy loaded at location ({x},{y})")
                     elif tile == 17:
@@ -142,15 +148,81 @@ class World():
                         self._exit_group.add(exit_tile)
         return
     
+    def update_physics(self):
+        self.update_physics_sprite(self.player)
+        for enemy in self.enemy_group:
+            self.update_physics_sprite(enemy)
+        for grenade in self.grenade_group:
+            self.update_physics_sprite(grenade)
+
+    def update_physics_sprite(self, sprite):
+        '''
+        Calculates and moves a sprite's position based on its current velocity
+        and the effect of gravity.
+        '''
+
+        # Calculate vertical movement
+        sprite.vel_y += GRAVITY
+        sprite.vel_y = min(10, sprite.vel_y)
+        dy = sprite.vel_y
+
+        # Calculate lateral movement
+        dx = sprite.vel_x * sprite.direction.value
+
+        for tile in self._obstacle_group:
+
+            # Handle collisions in x-direction
+            predicted_x = pygame.Rect(sprite.rect.x + dx, sprite.rect.y, 
+                                      sprite.rect.width, sprite.rect.height)
+            if tile.rect.colliderect(predicted_x):
+                if sprite.direction == Direction.LEFT:
+                    pass
+                    #sprite.rect.left = tile.rect.right
+                    #limit_value = tile.rect.right - sprite.rect.left
+                    #dx = min(dx, limit_value)
+                elif sprite.direction == Direction.RIGHT:
+                    pass
+                    #sprite.rect.right = tile.rect.left
+                    #limit_value = tile.rect.left - sprite.rect.right
+                    #dx = max(dx, limit_value)
+                #dx = 0
+
+            # Handle collisions in y-direction
+            predicted_y = pygame.Rect(sprite.rect.x, sprite.rect.y + dy, 
+                                      sprite.rect.width, sprite.rect.height)
+            if tile.rect.colliderect(predicted_y):
+                # Jumping up and hitting head on bottom of terrain
+                #if sprite.vel_y < 0:
+                #    sprite.vel_y = 0
+                #    dy = tile[1].bottom - sprite.rect.top
+                #    dy = 0
+                # Falling down and resting on top of terrain 
+                if sprite.vel_y >= 0:
+                    sprite.landed(sprite.vel_y)
+                    #sprite.vel_y = 0
+                    #sprite.in_air = False
+                    limit_value = tile.rect.top - sprite.rect.bottom
+                    dy = min(dy, limit_value)
+
+        # Move the sprite
+        sprite.rect.x += dx
+        sprite.rect.y += dy
+
     def draw(self, screen):
-        for tile in self._obstacle_list:
-            screen.blit(tile[0], tile[1])
+        self._obstacle_group.draw(screen)
+        self._water_group.draw(screen)
+        self._exit_group.draw(screen)        
+        self._decoration_group.draw(screen)
+        self._item_group.draw(screen)
+        self._bullet_group.draw(screen)
+        self._grenade_group.draw(screen)
+        self._explosion_group.draw(screen)
+        #self._enemy_group.draw(screen)
+        for enemy in self._enemy_group:
+            enemy.draw(screen)
 
 
-
-
-
-class Decoration(pygame.sprite.Sprite):
+class Obstacle(pygame.sprite.Sprite):
     def __init__(self, img, x, y):
         super().__init__()
         self.image = img
@@ -159,7 +231,6 @@ class Decoration(pygame.sprite.Sprite):
 
     def update(self):
         pass
-
 
 class Water(pygame.sprite.Sprite):
     def __init__(self, img, x, y):
@@ -171,6 +242,15 @@ class Water(pygame.sprite.Sprite):
     def update(self):
         pass
 
+class Decoration(pygame.sprite.Sprite):
+    def __init__(self, img, x, y):
+        super().__init__()
+        self.image = img
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (x, y)
+
+    def update(self):
+        pass
 
 class Exit(pygame.sprite.Sprite):
     def __init__(self, img, x, y):
