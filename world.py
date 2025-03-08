@@ -1,25 +1,12 @@
 
 import csv
 import pygame
-from soldier import Player, Enemy
+from soldier import Player, Enemy, HealthBar
 from weapons import ItemBox                                       # type: ignore
-from settings import WHITE, RED, GREEN   
-from settings import ROWS, COLS, TILE_SIZE, TILE_TYPES            # type: ignore
-from settings import GRAVITY, Direction
-
-class HealthBar():
-    def __init__(self, x, y, cur_health, max_health, width=150, height=20):
-        self.x, self.y = x, y
-        self.width = width
-        self.height = height
-        self.cur_health = cur_health
-        self.max_health = max_health
-    def draw(self, screen, health_value):
-        self.cur_health = health_value
-        health_size = self.width * self.cur_health / self.max_health
-        pygame.draw.rect(screen, WHITE, (self.x-1, self.y-1, self.width+2, self.height+2))
-        pygame.draw.rect(screen, RED, (self.x, self.y, self.width, self.height))
-        pygame.draw.rect(screen, GREEN, (self.x, self.y, health_size, self.height))
+from settings import (BG_COLOR, WHITE, RED, GREEN,
+                      SCREEN_HEIGHT, SCREEN_WIDTH, SCROLL_THRESHOLD,
+                      TILE_SIZE, TILE_TYPES, ROWS, COLS, 
+                      GRAVITY, Direction)
 
 
 class World():
@@ -37,8 +24,29 @@ class World():
         self._grenade_group = pygame.sprite.Group()
         self._explosion_group = pygame.sprite.Group()
 
+        # Hardcoded background images and layout positions
+        self.bg_image_list = [
+            pygame.image.load('img/background/sky_cloud.png').convert_alpha(),
+            pygame.image.load('img/background/mountain.png').convert_alpha(),
+            pygame.image.load('img/background/pine1.png').convert_alpha(),
+            pygame.image.load('img/background/pine2.png').convert_alpha()
+        ]
+        self.bg_image_ypos = [
+            0,
+            SCREEN_HEIGHT - self.bg_image_list[1].get_height() - 200,
+            SCREEN_HEIGHT - self.bg_image_list[2].get_height() - 150,
+            SCREEN_HEIGHT - self.bg_image_list[3].get_height()
+        ]
+        self.bg_width = min([img.get_width() for img in self.bg_image_list])
+        self.bg_scroll = 0
+
+        self.screen_scroll = 0
+
+            # Global fonts
+        self.font = pygame.font.SysFont('Futura', 30)
+
         for tile_num in range(TILE_TYPES):
-            img = pygame.image.load(f'img/tile/{tile_num}.png')
+            img = pygame.image.load(f'img/tile/{tile_num}.png').convert_alpha()
             img = pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
             self._tile_img_list.append(img)
 
@@ -161,6 +169,8 @@ class World():
         and the effect of gravity.
         '''
 
+        self.screen_scroll = 0
+
         # Calculate vertical movement
         sprite.vel_y += GRAVITY
         sprite.vel_y = min(10, sprite.vel_y)
@@ -172,16 +182,16 @@ class World():
         for tile in self._obstacle_group:
 
             # Handle collisions in x-direction
-            predicted_x = pygame.Rect(sprite.rect.x + dx, sprite.rect.y, 
-                                      sprite.rect.width, sprite.rect.height)
-            if tile.rect.colliderect(predicted_x):
-                if sprite.direction == Direction.LEFT:
-                    pass
+            #predicted_x = pygame.Rect(sprite.rect.x + dx, sprite.rect.y, 
+            #                          sprite.rect.width, sprite.rect.height)
+            #if tile.rect.colliderect(predicted_x):
+            #    if sprite.direction == Direction.LEFT:
+            #        pass
                     #sprite.rect.left = tile.rect.right
                     #limit_value = tile.rect.right - sprite.rect.left
                     #dx = min(dx, limit_value)
-                elif sprite.direction == Direction.RIGHT:
-                    pass
+            #    elif sprite.direction == Direction.RIGHT:
+            #        pass
                     #sprite.rect.right = tile.rect.left
                     #limit_value = tile.rect.left - sprite.rect.right
                     #dx = max(dx, limit_value)
@@ -202,24 +212,63 @@ class World():
                     #sprite.vel_y = 0
                     #sprite.in_air = False
                     limit_value = tile.rect.top - sprite.rect.bottom
-                    dy = min(dy, limit_value)
+                    dy = limit_value# min(dy, limit_value)
 
-        # Move the sprite
-        sprite.rect.x += dx
-        sprite.rect.y += dy
+        # Iif the player is moving too far right or left, scroll the screen
+        if (type(sprite) is Player
+            and (sprite.direction == Direction.RIGHT and sprite.rect.right >= SCREEN_WIDTH - SCROLL_THRESHOLD
+            or sprite.direction == Direction.LEFT and sprite.rect.left < SCROLL_THRESHOLD)):
+            self.screen_scroll = -dx
+            self.bg_scroll -= self.screen_scroll
+
+        # For everything else, move the sprite
+        else:
+            sprite.rect.x += dx
+            sprite.rect.y += dy
+
+
+    def draw_text(self, screen, text, color, x, y):
+        img = self.font.render(text, True, color)
+        screen.blit(img, (x, y))
 
     def draw(self, screen):
-        self._obstacle_group.draw(screen)
-        self._water_group.draw(screen)
-        self._exit_group.draw(screen)        
-        self._decoration_group.draw(screen)
-        self._item_group.draw(screen)
-        self._bullet_group.draw(screen)
-        self._grenade_group.draw(screen)
-        self._explosion_group.draw(screen)
-        #self._enemy_group.draw(screen)
+
+        # Draw the background and the level
+        #screen.fill(BG_COLOR)
+
+        print(self.bg_scroll)
+        #bg_image_pairs = zip(self.bg_image_list, self.bg_image_ypos)
+        for x in range(5):
+            screen.blit(self.bg_image_list[0], ((x * self.bg_width) - self.bg_scroll * 0.5, self.bg_image_ypos[0]))
+            screen.blit(self.bg_image_list[1], ((x * self.bg_width) - self.bg_scroll * 0.6, self.bg_image_ypos[1]))
+            screen.blit(self.bg_image_list[2], ((x * self.bg_width) - self.bg_scroll * 0.7, self.bg_image_ypos[2]))
+            screen.blit(self.bg_image_list[3], ((x * self.bg_width) - self.bg_scroll * 0.8, self.bg_image_ypos[3]))
+
+        for obstacle_tile in self._obstacle_group:
+            obstacle_tile.draw(screen, self.screen_scroll)
+        for water_tile in self._water_group:
+            water_tile.draw(screen, self.screen_scroll)
+        for exit_tile in self._exit_group:
+            exit_tile.draw(screen, self.screen_scroll)        
+        for decoration_tile in self._decoration_group:
+            decoration_tile.draw(screen, self.screen_scroll)
+        for item_tile in self._item_group:
+            item_tile.draw(screen, self.screen_scroll)
+        for bullet_tile in self._bullet_group:
+            bullet_tile.draw(screen, self.screen_scroll)
+        for grenade_tile in self._grenade_group:
+            grenade_tile.draw(screen, self.screen_scroll)
+        for explosion_tile in self._explosion_group:
+            explosion_tile.draw(screen, self.screen_scroll)
         for enemy in self._enemy_group:
-            enemy.draw(screen)
+            enemy.draw(screen, self.screen_scroll)
+        self.player.draw(screen, self.screen_scroll)
+
+        # Draw the status bars
+        self.health_bar.draw(screen, self.player.health)
+        self.draw_text(screen, f'GRENADES: {self.player.grenades}', WHITE, 10, 35)
+        self.draw_text(screen, f'ROUNDS: {self.player.ammo}', WHITE, 10, 60)
+        self.draw_text(screen, f'HEALTH: {self.player.health}', WHITE, 10, 85)
 
 
 class Obstacle(pygame.sprite.Sprite):
@@ -232,6 +281,11 @@ class Obstacle(pygame.sprite.Sprite):
     def update(self):
         pass
 
+    def draw(self, screen, screen_scroll):
+        self.rect.x += screen_scroll
+        screen.blit(self.image, self.rect)
+
+
 class Water(pygame.sprite.Sprite):
     def __init__(self, img, x, y):
         super().__init__()
@@ -241,6 +295,12 @@ class Water(pygame.sprite.Sprite):
 
     def update(self):
         pass
+
+    def draw(self, screen, screen_scroll):
+        self.rect.x += screen_scroll
+        screen.blit(self.image, self.rect)
+
+
 
 class Decoration(pygame.sprite.Sprite):
     def __init__(self, img, x, y):
@@ -252,6 +312,12 @@ class Decoration(pygame.sprite.Sprite):
     def update(self):
         pass
 
+    def draw(self, screen, screen_scroll):
+        self.rect.x += screen_scroll
+        screen.blit(self.image, self.rect)
+
+
+
 class Exit(pygame.sprite.Sprite):
     def __init__(self, img, x, y):
         super().__init__()
@@ -261,3 +327,8 @@ class Exit(pygame.sprite.Sprite):
 
     def update(self):
         pass
+
+    def draw(self, screen, screen_scroll):
+        self.rect.x += screen_scroll
+        screen.blit(self.image, self.rect)
+ 

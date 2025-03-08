@@ -15,6 +15,8 @@ COLS = 150
 TILE_SIZE = SCREEN_HEIGHT // ROWS
 TILE_TYPES = 21 # number of different tile types
 
+SCROLL_THRESHOLD = 200
+
 FPS = 60
 
 

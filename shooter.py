@@ -12,12 +12,6 @@ pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Shooter')
 
-# Global fonts
-font = pygame.font.SysFont('Futura', 30)
-def draw_text(text, font, color, x, y):
-    img = font.render(text, True, color)
-    screen.blit(img, (x, y))
-
 # Required to set the frame rate
 clock = pygame.time.Clock()
 
@@ -69,12 +63,14 @@ while game_running:
     world.explosion_group.update()
 
     # Check if the player collected any item boxes
-    for box in pygame.sprite.spritecollide(player, world.item_group, True):
-        if box.type == 'ammo':
-            player.ammo += 20
-        elif box.type == 'grenade':
-            player.grenades += 5
-        elif box.type == 'health':
+    for item in pygame.sprite.spritecollide(player, world.item_group, True):
+        count = item.quantity
+        btype = item.box_type
+        if btype == 'ammo':
+            player.ammo += min(player.ammo + count, player.max_ammo)
+        elif btype == 'grenade':
+            player.grenades += min(player.grenades + count, player.max_grenades)
+        elif btype == 'health':
             player.health = min(player.health + 25, player.max_health)
 
     # Check for bullet hits
@@ -111,8 +107,6 @@ while game_running:
         player.update(soldier.Action.DEATH)
         player.death()
 
-    # Draw the background and the level
-    screen.fill(BG_COLOR)
 
     # Handle enemy AI controls
     for enemy in world.enemy_group:
@@ -128,14 +122,7 @@ while game_running:
                 enemy.update(soldier.Action.DEATH)
                 enemy.death()
 
-    # Draw the status bars
-    world.health_bar.draw(screen, player.health)
-    draw_text(f'GRENADES: {player.grenades}', font, WHITE, 10, 35)
-    draw_text(f'ROUNDS: {player.ammo}', font, WHITE, 10, 60)
-    draw_text(f'HEALTH: {player.health}', font, WHITE, 10, 85)
-
     world.draw(screen)
-    player.draw(screen)
 
     for event in pygame.event.get():
 

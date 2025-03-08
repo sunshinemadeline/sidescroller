@@ -1,12 +1,28 @@
 import os
 import random
 import pygame
-from weapons import Bullet, Grenade             # type: ignore
-from settings import TILE_SIZE, RED, Direction, Action, GRAVITY
+from weapons import Bullet, Grenade                               # type: ignore
+from settings import Direction, Action
+from settings import TILE_SIZE, WHITE, RED, GREEN
 
 
 # All soldiers share these common animation types
 animation_types = ['Idle', 'Run', 'Jump', 'Death']
+
+
+class HealthBar():
+    def __init__(self, x, y, cur_health, max_health, width=150, height=20):
+        self.x, self.y = x, y
+        self.width = width
+        self.height = height
+        self.cur_health = cur_health
+        self.max_health = max_health
+    def draw(self, screen, health_value):
+        self.cur_health = health_value
+        health_size = self.width * self.cur_health / self.max_health
+        pygame.draw.rect(screen, WHITE, (self.x-1, self.y-1, self.width+2, self.height+2))
+        pygame.draw.rect(screen, RED, (self.x, self.y, self.width, self.height))
+        pygame.draw.rect(screen, GREEN, (self.x, self.y, health_size, self.height))
 
 
 def init():
@@ -45,8 +61,10 @@ class Soldier(pygame.sprite.Sprite):
         self.speed = speed
         self.start_ammo = ammo
         self.ammo = self.start_ammo
+        self.max_ammo = self.start_ammo * 2
         self.start_grenades = grenades
         self.grenades = self.start_grenades
+        self.max_grenades = self.start_grenades * 2
         self.grenade_cooldown = 0
         self.shoot_cooldown = 0
         self.max_health = health
@@ -154,8 +172,9 @@ class Soldier(pygame.sprite.Sprite):
         self.vel_x = 0
         self.alive = False
 
-    def draw(self, screen):
+    def draw(self, screen, screen_scroll):
         img = pygame.transform.flip(self.image, self.flip, False)
+        self.rect.x += screen_scroll
         screen.blit(img, self.rect)
 
     
@@ -266,6 +285,3 @@ class Player(Soldier):
     def throw(self):
         self.grenade_cooldown = 100
         return super().throw()
-    
-    def holler(self, phrase):
-        print(phrase)

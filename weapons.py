@@ -7,9 +7,10 @@ from settings import GRAVITY, Direction
 class ItemBox(pygame.sprite.Sprite):
     ''' Supplies for the player to collect with ammo, grenades, or health. '''
 
-    def __init__(self, x, y, box_type='ammo'):
+    def __init__(self, x, y, box_type='ammo', quantity=20):
         super().__init__()
         self.box_type = box_type
+        self.quantity = quantity
         self.image = pygame.image.load(f'img/icons/{box_type}_box.png')
         self.image = self.image.convert_alpha()
         self.rect = self.image.get_rect()
@@ -17,6 +18,10 @@ class ItemBox(pygame.sprite.Sprite):
 
     def update(self):
         pass
+
+    def draw(self, screen, screen_scroll):
+        self.rect.x += screen_scroll
+        screen.blit(self.image, self.rect)
 
 
 class Bullet(pygame.sprite.Sprite):
@@ -34,6 +39,10 @@ class Bullet(pygame.sprite.Sprite):
 
     def update(self):
         self.rect.x += self.speed * self.direction.value
+
+    def draw(self, screen, screen_scroll):
+        self.rect.x += screen_scroll
+        screen.blit(self.image, self.rect)
 
 
 class Grenade(pygame.sprite.Sprite):
@@ -74,6 +83,10 @@ class Grenade(pygame.sprite.Sprite):
     def update(self):
         self.fuse_timer -= 1
 
+    def draw(self, screen, screen_scroll):
+        self.rect.x += screen_scroll
+        screen.blit(self.image, self.rect)
+
 
 class Explosion(pygame.sprite.Sprite):
     ''' Animation sequence object for an exploding grenade. '''
@@ -105,4 +118,7 @@ class Explosion(pygame.sprite.Sprite):
                 self.kill()
             else:
                 self.image = self.frames[self.frame_idx]
-            
+
+    def draw(self, screen, screen_scroll):
+        self.rect.x += screen_scroll
+        screen.blit(self.image, self.rect)
