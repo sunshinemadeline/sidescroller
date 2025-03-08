@@ -1,0 +1,183 @@
+
+import csv
+import pygame
+from soldier import Soldier, ItemBox
+from settings import WHITE, RED, GREEN   
+from settings import ROWS, COLS, TILE_SIZE, TILE_TYPES            # type: ignore
+
+
+class HealthBar():
+    def __init__(self, x, y, cur_health, max_health, width=150, height=20):
+        self.x, self.y = x, y
+        self.width = width
+        self.height = height
+        self.cur_health = cur_health
+        self.max_health = max_health
+    def draw(self, screen, health_value):
+        self.cur_health = health_value
+        health_size = self.width * self.cur_health / self.max_health
+        pygame.draw.rect(screen, WHITE, (self.x-1, self.y-1, self.width+2, self.height+2))
+        pygame.draw.rect(screen, RED, (self.x, self.y, self.width, self.height))
+        pygame.draw.rect(screen, GREEN, (self.x, self.y, health_size, self.height))
+
+
+class World():
+    def __init__(self):
+        self._tile_img_list = []
+        self._obstacle_list = []
+        self._player = None
+        self._health_bar = None
+        self._item_group = pygame.sprite.Group()
+        self._enemy_group = pygame.sprite.Group()
+        self._bullet_group = pygame.sprite.Group()
+        self._grenade_group = pygame.sprite.Group()
+        self._explosion_group = pygame.sprite.Group()
+        self._water_group = pygame.sprite.Group()
+        self._decoration_group = pygame.sprite.Group()
+        self._exit_group = pygame.sprite.Group()
+
+        for tile_num in range(TILE_TYPES):
+            img = pygame.image.load(f'img/tile/{tile_num}.png')
+            img = pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
+            self._tile_img_list.append(img)
+
+    @property
+    def player(self):
+        return self._player
+    
+    @property
+    def health_bar(self):
+        return self._health_bar
+
+    @property
+    def item_group(self):
+        return self._item_group
+    
+    @property
+    def enemy_group(self):
+        return self._enemy_group
+    
+    @property
+    def bullet_group(self):
+        return self._bullet_group
+
+    @property
+    def grenade_group(self):
+        return self._grenade_group
+
+    @property
+    def explosion_group(self):
+        return self._explosion_group
+
+    @property
+    def obstacles(self):
+        return self._obstacle_list
+    
+    @property
+    def decoration_group(self):
+        return self._decoration_group
+
+    @property
+    def water_group(self):
+        return self._water_group
+
+    @property
+    def exit_group(self):
+        return self._exit_group
+
+    def load_game_level(self, level):
+        # Create tile list for this level
+        world_data = []
+        for row in range(ROWS):
+            empty_row = [-1] * COLS
+            world_data.append(empty_row)
+
+        with open(f'level{level}_data.csv', 'r') as csvfile:  # Russ: newline=''
+            reader = csv.reader(csvfile, delimiter=',')
+            for y, row in enumerate(reader):
+                for x, tile in enumerate(row):
+                    world_data[y][x] = int(tile)
+
+        # Note: -1 is an empty space
+        # TODO: Combine with previous code
+        for y, row in enumerate(world_data):
+            for x, tile in enumerate(row):
+                if tile >= 0:
+                    img = self._tile_img_list[tile]
+                    rect = img.get_rect()
+                    rect.x = x * TILE_SIZE
+                    rect.y = y * TILE_SIZE
+                    tile_data = (img, rect)
+
+                    if tile < 9: # TODO: 9 is a magic number because 0-8 are dirt tiles
+                        self._obstacle_list.append(tile_data)
+                    elif tile < 11:
+                        water_tile = Water(img, rect.x, rect.y)
+                        self._water_group.add(water_tile)
+                    elif tile < 15:
+                        decoration_tile = Decoration(img, rect.x, rect.y)
+                        self._decoration_group.add(decoration_tile)
+                    elif tile == 15:
+                        self._player = Soldier(rect.x, rect.y, 'player', 1.65)
+                        self._health_bar = HealthBar(10, 10, self._player.health, self._player.max_health)
+                        print(f"Player 1 loaded at location ({x},{y})")
+                    elif tile == 16:
+                        enemy = Soldier(rect.x, rect.y, 'enemy', 1.65, 2)
+                        self._enemy_group.add(enemy)
+                        print(f"Enemy loaded at location ({x},{y})")
+                    elif tile == 17:
+                        item = ItemBox(rect.x, rect.y, 'ammo')
+                        self._item_group.add(item)
+                        print(f"Ammo box loaded at location ({x},{y})")
+                    elif tile == 18:
+                        item = ItemBox(rect.x, rect.y, 'grenade')
+                        self._item_group.add(item)
+                        print(f"Grenade box loaded at location ({x},{y})")
+                    elif tile == 19:
+                        item = ItemBox(rect.x, rect.y, 'health')
+                        self._item_group.add(item)
+                        print(f"Health box loaded at location ({x},{y})")
+                    elif tile == 20: # level exit
+                        exit_tile = Exit(img, rect.x, rect.y)
+                        self._exit_group.add(exit_tile)
+        return
+    
+    def draw(self, screen):
+        for tile in self._obstacle_list:
+            screen.blit(tile[0], tile[1])
+
+
+
+
+
+class Decoration(pygame.sprite.Sprite):
+    def __init__(self, img, x, y):
+        super().__init__()
+        self.image = img
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (x, y)
+
+    def update(self):
+        pass
+
+
+class Water(pygame.sprite.Sprite):
+    def __init__(self, img, x, y):
+        super().__init__()
+        self.image = img
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (x, y)
+
+    def update(self):
+        pass
+
+
+class Exit(pygame.sprite.Sprite):
+    def __init__(self, img, x, y):
+        super().__init__()
+        self.image = img
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (x, y)
+
+    def update(self):
+        pass
