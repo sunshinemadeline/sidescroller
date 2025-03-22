@@ -1,11 +1,11 @@
 
-from settings import BG_COLOR, RED, WHITE                         # type: ignore
-from settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS             # type: ignore
-from settings import ROWS, COLS, TILE_SIZE, TILE_TYPES            # type: ignore
-from world import World                                           # type: ignore
+from settings import (BG_COLOR, RED, WHITE,                      # type: ignore
+                      SCREEN_WIDTH, SCREEN_HEIGHT, FPS,          # type: ignore
+                      ROWS, COLS, TILE_SIZE, TILE_TYPE_COUNT)    # type: ignore
+from world import World                                          # type: ignore
 import pygame
 import soldier
-import weapons                                                    # type: ignore
+import weapons                                                   # type: ignore
 
 # Create the window
 pygame.init()
@@ -15,17 +15,44 @@ pygame.display.set_caption('Shooter')
 # Required to set the frame rate
 clock = pygame.time.Clock()
 
-# Keyboard events
-moving_left = False
-moving_right = False
-jumping = False
-shoot = False
-throw = False
+# Keyboard action events
+mleft_key = False
+mright_key = False
+jump_key = False
+shoot_key = False
+throw_key = False
 
-# World variables
-level = 1
+def handle_player_keyboard_events(event: pygame.event.Event) -> None:
+    ''' 
+    Processes keystrokes and sets the global action variables accordingly
+    '''
+    global mleft_key, mright_key, jump_key, shoot_key, throw_key
+    if event.type == pygame.KEYDOWN:
+        if event.key == pygame.K_a:
+            mleft_key = True
+        if event.key == pygame.K_d:
+            mright_key = True
+        if event.key == pygame.K_w:
+            jump_key = True
+        if event.key == pygame.K_SPACE:
+            shoot_key = True
+        if event.key == pygame.K_q:
+            throw_key = True
+    if event.type == pygame.KEYUP:
+        if event.key == pygame.K_a:
+            mleft_key = False
+        if event.key == pygame.K_d:
+            mright_key = False
+        if event.key == pygame.K_w:
+            jump_key = False
+        if event.key == pygame.K_SPACE:
+            shoot_key = False    
+        if event.key == pygame.K_q:
+            throw_key = False
+
+# World variables including a shortcut for the player
 world = World()
-world.load_game_level(level)
+world.load_game_level()
 player = world.player
 
 # Main game loop
@@ -37,20 +64,20 @@ while game_running:
 
     # Updates all sprites that are governed by the physics engine
     if player.alive:
-        if shoot and player.ammo > 0 and player.shoot_cooldown == 0:
+        if shoot_key and player.ammo > 0 and player.shoot_cooldown == 0:
             bullet = player.shoot()
             world.bullet_group.add(bullet)
-        if throw and player.grenades > 0 and player.grenade_cooldown == 0:
+        if throw_key and player.grenades > 0 and player.grenade_cooldown == 0:
             grenade = player.throw()
             world.grenade_group.add(grenade)
 
-        player.move(moving_left, moving_right, jumping)
+        player.move(mleft_key, mright_key, jump_key)
 
         # Handle player animations
         if player.in_air:
             player.update(soldier.Action.JUMP)
-        elif (moving_left and not moving_right 
-              or moving_right and not moving_left):
+        elif (mleft_key and not mright_key 
+              or mright_key and not mleft_key):
             player.update(soldier.Action.RUN)
         else:
             player.update(soldier.Action.IDLE)
@@ -73,7 +100,7 @@ while game_running:
         elif btype == 'health':
             player.health = min(player.health + 25, player.max_health)
 
-    # Check for bullet hits
+    # Check for bullet hit damage
     for bullet in pygame.sprite.spritecollide(player, world.bullet_group, True):
         player.health -= bullet.damage
     for enemy in world.enemy_group:
@@ -82,7 +109,7 @@ while game_running:
             if enemy.health > 0:
                 bullet.kill()
 
-    # Remove sprites that go past the end of the screen
+    # Remove any bullet sprites that go past the end of the screen
     for bullet in world.bullet_group:
         if bullet.rect.right < 0 or bullet.rect.left > SCREEN_WIDTH:
             bullet.kill()
@@ -104,62 +131,31 @@ while game_running:
 
     # Check for player death
     if player.health <= 0:
-        player.update(soldier.Action.DEATH)
         player.death()
-
 
     # Handle enemy AI controls
     for enemy in world.enemy_group:
         if enemy.alive:
             if (player.alive 
-                and enemy.vision.colliderect(player.rect)
-                and enemy.ammo > 0 
-                and enemy.shoot_cooldown == 0):
+                    and enemy.vision.colliderect(player.rect)
+                    and enemy.ammo > 0 
+                    and enemy.shoot_cooldown == 0):
                 bullet = enemy.ai_shoot()
                 world.bullet_group.add(bullet)
             enemy.ai_move()
             if enemy.health <= 0:
-                enemy.update(soldier.Action.DEATH)
                 enemy.death()
 
-    world.draw(screen)
-
+    # Handle the various inputs to the game
     for event in pygame.event.get():
-
-        # Quit event for mouse click on [X] box
-        if event.type == pygame.QUIT:
+        if (event.type == pygame.QUIT
+            or event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
             game_running = False
-        
-        # Game controller
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                game_running = False
-            if event.key == pygame.K_a:
-                moving_left = True
-            if event.key == pygame.K_d:
-                moving_right = True
-            if event.key == pygame.K_w: # TODO: more consistent logic loop vs soldier class
-                jumping = True
-            if event.key == pygame.K_SPACE:
-                shoot = True
-            if event.key == pygame.K_q:
-                throw = True
-        if event.type == pygame.KEYUP:
-            if event.key == pygame.K_a:
-                moving_left = False
-            if event.key == pygame.K_d:
-                moving_right = False
-            if event.key == pygame.K_w:
-                jumping = False
-            if event.key == pygame.K_SPACE:
-                shoot = False    
-            if event.key == pygame.K_q:
-                throw = False
+        handle_player_keyboard_events(event)
 
-    # update the game screen at a certain FPS
+    # Update the game screen at a certain FPS
+    world.draw(screen)
     pygame.display.update()
     clock.tick(FPS)
-
-
 
 pygame.quit()

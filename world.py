@@ -1,11 +1,15 @@
 
 import csv
 import pygame
+from pygame.sprite import spritecollideany
 from soldier import Player, Enemy, HealthBar
 from weapons import ItemBox                                       # type: ignore
 from settings import (BG_COLOR, WHITE, RED, GREEN,
                       SCREEN_HEIGHT, SCREEN_WIDTH, SCROLL_THRESHOLD,
-                      TILE_SIZE, TILE_TYPES, ROWS, COLS, 
+                      TILE_SIZE, TILE_TYPE_COUNT, ROWS, COLS,
+                      DIRT_TILE_LAST, WATER_TILE_LAST, DECORATION_TILE_LAST,
+                      PLAYER_TILE_ID, ENEMY_TILE_ID, AMMO_TILE_ID,
+                      GRENADE_TILE_ID, HEALTH_TILE_ID, LEVEL_EXIT_TILE_ID,
                       GRAVITY, Direction)
 
 
@@ -23,6 +27,7 @@ class World():
         self._bullet_group = pygame.sprite.Group()
         self._grenade_group = pygame.sprite.Group()
         self._explosion_group = pygame.sprite.Group()
+        self._current_level = 1
 
         # Hardcoded background images and layout positions
         self.bg_image_list = [
@@ -39,13 +44,12 @@ class World():
         ]
         self.bg_width = min([img.get_width() for img in self.bg_image_list])
         self.bg_scroll = 0
-
         self.screen_scroll = 0
 
-            # Global fonts
-        self.font = pygame.font.SysFont('Futura', 30)
+        # Global fonts
+        self._font = pygame.font.SysFont('Futura', 30)
 
-        for tile_num in range(TILE_TYPES):
+        for tile_num in range(TILE_TYPE_COUNT):
             img = pygame.image.load(f'img/tile/{tile_num}.png').convert_alpha()
             img = pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
             self._tile_img_list.append(img)
@@ -79,12 +83,12 @@ class World():
         return self._explosion_group
 
     @property
-    def obstacles(self):
-        return self._obstacle_group
-    
-    @property
     def decoration_group(self):
         return self._decoration_group
+
+    @property
+    def obstacles(self):
+        return self._obstacle_group
     
     @property
     def obstacle_group(self):
@@ -98,63 +102,73 @@ class World():
     def exit_group(self):
         return self._exit_group
 
-    def load_game_level(self, level):
-        # Create tile list for this level
+    def load_game_tile(self, tile, idx_x, idx_y):
+        '''
+        Loads an individual game tile by creating the tile object and adding
+        it to the appropriate sprite group.
+        '''
+        img = self._tile_img_list[tile]
+        rect = img.get_rect()
+        rect.x = idx_x * TILE_SIZE
+        rect.y = idx_y * TILE_SIZE
+
+        if tile <= DIRT_TILE_LAST:
+            obstacle_tile = Obstacle(img, rect.x, rect.y)
+            self._obstacle_group.add(obstacle_tile)
+        elif tile <= WATER_TILE_LAST:
+            water_tile = Water(img, rect.x, rect.y)
+            self._water_group.add(water_tile)
+        elif tile <= DECORATION_TILE_LAST:
+            decoration_tile = Decoration(img, rect.x, rect.y)
+            self._decoration_group.add(decoration_tile)
+        elif tile == PLAYER_TILE_ID:
+            self._player = Player(rect.x, rect.y, 'player', 1.65)
+            self._health_bar = HealthBar(10, 10, self._player.max_health)
+        elif tile == ENEMY_TILE_ID:
+            enemy = Enemy(rect.x, rect.y, 'enemy', 1.65, 2)
+            self._enemy_group.add(enemy)
+        elif tile == AMMO_TILE_ID:
+            item = ItemBox(rect.x, rect.y, 'ammo')
+            self._item_group.add(item)
+        elif tile == GRENADE_TILE_ID:
+            item = ItemBox(rect.x, rect.y, 'grenade')
+            self._item_group.add(item)
+        elif tile == HEALTH_TILE_ID:
+            item = ItemBox(rect.x, rect.y, 'health')
+            self._item_group.add(item)
+        elif tile == LEVEL_EXIT_TILE_ID: # level exit
+            exit_tile = Exit(img, rect.x, rect.y)
+            self._exit_group.add(exit_tile)        
+
+
+    def load_game_level(self, level=None):
+        '''
+        Loads the starting world state for the given level.
+        '''
+        if level is None:
+            level = self._current_level
+
+        # Create an empty tile list of the appropriate size for this level
         world_data = []
         for row in range(ROWS):
             empty_row = [-1] * COLS
             world_data.append(empty_row)
 
-        with open(f'level{level}_data.csv', 'r') as csvfile:  # Russ: newline=''
+        # Read the level data from a CSV file
+        with open(f'level{level}_data.csv', 'r') as csvfile:
             reader = csv.reader(csvfile, delimiter=',')
-            for y, row in enumerate(reader):
-                for x, tile in enumerate(row):
-                    world_data[y][x] = int(tile)
+            for idx_y, row_of_tiles in enumerate(reader):
+                for idx_x, tile_data in enumerate(row_of_tiles):
+                    world_data[idx_y][idx_x] = int(tile_data)
 
-        # Note: -1 is an empty space
-        # TODO: Combine with previous code
-        for y, row in enumerate(world_data):
-            for x, tile in enumerate(row):
-                if tile >= 0:
-                    img = self._tile_img_list[tile]
-                    rect = img.get_rect()
-                    rect.x = x * TILE_SIZE
-                    rect.y = y * TILE_SIZE
-                    #tile_data = (img, rect)
-
-                    if tile < 9: # TODO: 9 is a magic number because 0-8 are dirt tiles
-                        obstacle_tile = Obstacle(img, rect.x, rect.y)
-                        self._obstacle_group.add(obstacle_tile)
-                    elif tile < 11:
-                        water_tile = Water(img, rect.x, rect.y)
-                        self._water_group.add(water_tile)
-                    elif tile < 15:
-                        decoration_tile = Decoration(img, rect.x, rect.y)
-                        self._decoration_group.add(decoration_tile)
-                    elif tile == 15:
-                        self._player = Player(rect.x, rect.y, 'player', 1.65)
-                        self._health_bar = HealthBar(10, 10, self._player.health, self._player.max_health)
-                        print(f"Player 1 loaded at location ({x},{y})")
-                    elif tile == 16:
-                        enemy = Enemy(rect.x, rect.y, 'enemy', 1.65, 2)
-                        self._enemy_group.add(enemy)
-                        print(f"Enemy loaded at location ({x},{y})")
-                    elif tile == 17:
-                        item = ItemBox(rect.x, rect.y, 'ammo')
-                        self._item_group.add(item)
-                        print(f"Ammo box loaded at location ({x},{y})")
-                    elif tile == 18:
-                        item = ItemBox(rect.x, rect.y, 'grenade')
-                        self._item_group.add(item)
-                        print(f"Grenade box loaded at location ({x},{y})")
-                    elif tile == 19:
-                        item = ItemBox(rect.x, rect.y, 'health')
-                        self._item_group.add(item)
-                        print(f"Health box loaded at location ({x},{y})")
-                    elif tile == 20: # level exit
-                        exit_tile = Exit(img, rect.x, rect.y)
-                        self._exit_group.add(exit_tile)
-        return
+        # Populate the world by loading the appropriate game tile
+        for idx_y, row in enumerate(world_data):
+            for idx_x, tile in enumerate(row):
+                if tile >= 0: # -1 is an empty space
+                    self.load_game_tile(tile, idx_x, idx_y)
+        
+        # Nothing really to return here
+        return None
     
     def update_physics(self):
         self.update_physics_sprite(self.player)
@@ -179,42 +193,26 @@ class World():
         # Calculate lateral movement
         dx = sprite.vel_x * sprite.direction.value
 
+        # Detect collisions with wall (x) and ground (y) obstacles
         for tile in self._obstacle_group:
-
-            # Handle collisions in x-direction
-            #predicted_x = pygame.Rect(sprite.rect.x + dx, sprite.rect.y, 
-            #                          sprite.rect.width, sprite.rect.height)
-            #if tile.rect.colliderect(predicted_x):
-            #    if sprite.direction == Direction.LEFT:
-            #        pass
-                    #sprite.rect.left = tile.rect.right
-                    #limit_value = tile.rect.right - sprite.rect.left
-                    #dx = min(dx, limit_value)
-            #    elif sprite.direction == Direction.RIGHT:
-            #        pass
-                    #sprite.rect.right = tile.rect.left
-                    #limit_value = tile.rect.left - sprite.rect.right
-                    #dx = max(dx, limit_value)
-                #dx = 0
-
-            # Handle collisions in y-direction
+            predicted_x = pygame.Rect(sprite.rect.x + dx, sprite.rect.y, 
+                                      sprite.rect.width, sprite.rect.height)
+            if tile.rect.colliderect(predicted_x):
+                if sprite.direction == Direction.LEFT:
+                    sprite.rect.left = tile.rect.right
+                elif sprite.direction == Direction.RIGHT:
+                    sprite.rect.right = tile.rect.left
             predicted_y = pygame.Rect(sprite.rect.x, sprite.rect.y + dy, 
                                       sprite.rect.width, sprite.rect.height)
             if tile.rect.colliderect(predicted_y):
-                # Jumping up and hitting head on bottom of terrain
-                #if sprite.vel_y < 0:
-                #    sprite.vel_y = 0
-                #    dy = tile[1].bottom - sprite.rect.top
-                #    dy = 0
-                # Falling down and resting on top of terrain 
-                if sprite.vel_y >= 0:
+                if sprite.vel_y < 0:  # jumping and hitting head
+                    sprite.vel_y = 0
+                    dy = tile.rect.bottom - sprite.rect.top
+                if sprite.vel_y > 0:  # landing on surface
                     sprite.landed(sprite.vel_y)
-                    #sprite.vel_y = 0
-                    #sprite.in_air = False
-                    limit_value = tile.rect.top - sprite.rect.bottom
-                    dy = limit_value# min(dy, limit_value)
+                    dy = tile.rect.top - sprite.rect.bottom
 
-        # Iif the player is moving too far right or left, scroll the screen
+        # If the player is moving too far right or left, scroll the screen
         if (type(sprite) is Player
             and (sprite.direction == Direction.RIGHT and sprite.rect.right >= SCREEN_WIDTH - SCROLL_THRESHOLD
             or sprite.direction == Direction.LEFT and sprite.rect.left < SCROLL_THRESHOLD)):
@@ -228,7 +226,7 @@ class World():
 
 
     def draw_text(self, screen, text, color, x, y):
-        img = self.font.render(text, True, color)
+        img = self._font.render(text, True, color)
         screen.blit(img, (x, y))
 
     def draw(self, screen):
@@ -236,7 +234,7 @@ class World():
         # Draw the background and the level
         #screen.fill(BG_COLOR)
 
-        print(self.bg_scroll)
+        #print(self.bg_scroll)
         #bg_image_pairs = zip(self.bg_image_list, self.bg_image_ypos)
         for x in range(5):
             screen.blit(self.bg_image_list[0], ((x * self.bg_width) - self.bg_scroll * 0.5, self.bg_image_ypos[0]))

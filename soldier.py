@@ -11,12 +11,17 @@ animation_types = ['Idle', 'Run', 'Jump', 'Death']
 
 
 class HealthBar():
-    def __init__(self, x, y, cur_health, max_health, width=150, height=20):
+    '''
+    Graphic to visualize the player's health as a green/red rectangle.
+    '''
+
+    def __init__(self, x, y, max_health, width=150, height=20):
         self.x, self.y = x, y
         self.width = width
         self.height = height
-        self.cur_health = cur_health
+        self.cur_health = max_health
         self.max_health = max_health
+
     def draw(self, screen, health_value):
         self.cur_health = health_value
         health_size = self.width * self.cur_health / self.max_health
@@ -167,6 +172,7 @@ class Soldier(pygame.sprite.Sprite):
             return None
 
     def death(self):
+        self.update(Action.DEATH)
         self.health = 0
         self.speed = 0
         self.vel_x = 0
