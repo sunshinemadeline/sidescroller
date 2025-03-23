@@ -59,9 +59,6 @@ player = world.player
 game_running = True
 while game_running:
    
-    # Update the position of all physics-controlled sprites
-    world.update_physics()
-
     # Updates all sprites that are governed by the physics engine
     if player.alive:
         if shoot_key and player.ammo > 0 and player.shoot_cooldown == 0:
@@ -82,12 +79,8 @@ while game_running:
         else:
             player.update(soldier.Action.IDLE)
 
-    # Update all of the non-player sprites
-    world.item_group.update()
-    world.enemy_group.update()
-    world.bullet_group.update()
-    world.grenade_group.update()
-    world.explosion_group.update()
+    # Update the position of all physics-controlled sprites
+    world.update()
 
     # Check if the player collected any item boxes
     for item in pygame.sprite.spritecollide(player, world.item_group, True):
@@ -148,14 +141,14 @@ while game_running:
 
     # Handle the various inputs to the game
     for event in pygame.event.get():
-        if (event.type == pygame.QUIT
-            or event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+        if (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
+                or event.type == pygame.QUIT):
             game_running = False
         handle_player_keyboard_events(event)
 
     # Update the game screen at a certain FPS
     world.draw(screen)
-    pygame.display.update()
     clock.tick(FPS)
+    pygame.display.flip()
 
 pygame.quit()

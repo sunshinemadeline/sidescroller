@@ -30,21 +30,21 @@ class World():
         self._current_level = 1
 
         # Hardcoded background images and layout positions
-        self.bg_image_list = [
+        self.bg_images = [
             pygame.image.load('img/background/sky_cloud.png').convert_alpha(),
             pygame.image.load('img/background/mountain.png').convert_alpha(),
             pygame.image.load('img/background/pine1.png').convert_alpha(),
             pygame.image.load('img/background/pine2.png').convert_alpha()
         ]
-        self.bg_image_ypos = [
+        self.bg_ypos = [
             0,
-            SCREEN_HEIGHT - self.bg_image_list[1].get_height() - 200,
-            SCREEN_HEIGHT - self.bg_image_list[2].get_height() - 150,
-            SCREEN_HEIGHT - self.bg_image_list[3].get_height()
+            SCREEN_HEIGHT - self.bg_images[1].get_height() - 200,
+            SCREEN_HEIGHT - self.bg_images[2].get_height() - 150,
+            SCREEN_HEIGHT - self.bg_images[3].get_height()
         ]
-        self.bg_width = min([img.get_width() for img in self.bg_image_list])
+        self.bg_width = min([img.get_width() for img in self.bg_images])
         self.bg_scroll = 0
-        self.screen_scroll = 0
+        self.camera_scroll = 0
 
         # Global fonts
         self._font = pygame.font.SysFont('Futura', 30)
@@ -170,103 +170,122 @@ class World():
         # Nothing really to return here
         return None
     
-    def update_physics(self):
-        self.update_physics_sprite(self.player)
-        for enemy in self.enemy_group:
-            self.update_physics_sprite(enemy)
-        for grenade in self.grenade_group:
-            self.update_physics_sprite(grenade)
 
-    def update_physics_sprite(self, sprite):
+    def update(self):
+        
+        # Update based on the player's movements
+        self.update_physics(self.player)
+        self.update_scrolling()
+
+        # Update all of the other items
+        for enemy in self.enemy_group:
+            self.update_physics(enemy)
+        for grenade in self.grenade_group:
+            self.update_physics(grenade)
+        self.item_group.update()
+        self.enemy_group.update()
+        self.bullet_group.update()
+        self.grenade_group.update()
+        self.explosion_group.update()
+
+
+    def update_scrolling(self):
+        # If the player is moving too far right or left, scroll the screen
+        if ((self._player.direction == Direction.RIGHT 
+                and self._player.rect.right >= SCREEN_WIDTH - SCROLL_THRESHOLD)
+            or (self._player.direction == Direction.LEFT 
+                and self._player.rect.left + self.camera_scroll < SCROLL_THRESHOLD)):
+            self.camera_scroll -= self.player.dx
+            self.bg_scroll += self.player.dx
+        else:
+            pass
+
+
+    def update_physics(self, sprite):
         '''
         Calculates and moves a sprite's position based on its current velocity
         and the effect of gravity.
         '''
 
-        self.screen_scroll = 0
-
         # Calculate vertical movement
         sprite.vel_y += GRAVITY
         sprite.vel_y = min(10, sprite.vel_y)
-        dy = sprite.vel_y
+        sprite.dy = sprite.vel_y
 
         # Calculate lateral movement
-        dx = sprite.vel_x * sprite.direction.value
+        sprite.dx = sprite.vel_x * sprite.direction.value
 
         # Detect collisions with wall (x) and ground (y) obstacles
         for tile in self._obstacle_group:
-            predicted_x = pygame.Rect(sprite.rect.x + dx, sprite.rect.y, 
+            predicted_x = pygame.Rect(sprite.rect.x + sprite.dx, sprite.rect.y, 
                                       sprite.rect.width, sprite.rect.height)
             if tile.rect.colliderect(predicted_x):
                 if sprite.direction == Direction.LEFT:
-                    sprite.rect.left = tile.rect.right
+                    sprite.dx = tile.rect.right - sprite.rect.left
                 elif sprite.direction == Direction.RIGHT:
-                    sprite.rect.right = tile.rect.left
-            predicted_y = pygame.Rect(sprite.rect.x, sprite.rect.y + dy, 
+                    sprite.dx = tile.rect.left - sprite.rect.right
+                sprite.vel_x = 0
+            predicted_y = pygame.Rect(sprite.rect.x, sprite.rect.y + sprite.dy, 
                                       sprite.rect.width, sprite.rect.height)
             if tile.rect.colliderect(predicted_y):
-                if sprite.vel_y < 0:  # jumping and hitting head
-                    sprite.vel_y = 0
-                    dy = tile.rect.bottom - sprite.rect.top
-                if sprite.vel_y > 0:  # landing on surface
+                if sprite.vel_y < 0: # jumping and hitting head
+                    sprite.dy = tile.rect.bottom - sprite.rect.top
+                if sprite.vel_y > 0:
                     sprite.landed(sprite.vel_y)
-                    dy = tile.rect.top - sprite.rect.bottom
+                    sprite.dy = tile.rect.top - sprite.rect.bottom
+                sprite.vel_y = 0
 
-        # If the player is moving too far right or left, scroll the screen
-        if (type(sprite) is Player
-            and (sprite.direction == Direction.RIGHT and sprite.rect.right >= SCREEN_WIDTH - SCROLL_THRESHOLD
-            or sprite.direction == Direction.LEFT and sprite.rect.left < SCROLL_THRESHOLD)):
-            self.screen_scroll = -dx
-            self.bg_scroll -= self.screen_scroll
+        # Move the sprite and return the distance
+        sprite.rect.x += sprite.dx
+        sprite.rect.y += sprite.dy
+        return
 
-        # For everything else, move the sprite
-        else:
-            sprite.rect.x += dx
-            sprite.rect.y += dy
-
-
-    def draw_text(self, screen, text, color, x, y):
-        img = self._font.render(text, True, color)
-        screen.blit(img, (x, y))
 
     def draw(self, screen):
-
-        # Draw the background and the level
+        '''
+        Blits all of the sprites in the entire world onto the screen.
+        '''
         #screen.fill(BG_COLOR)
 
-        #print(self.bg_scroll)
-        #bg_image_pairs = zip(self.bg_image_list, self.bg_image_ypos)
+        # Draw the background graphics (sky, mountains, trees, etc)
         for x in range(5):
-            screen.blit(self.bg_image_list[0], ((x * self.bg_width) - self.bg_scroll * 0.5, self.bg_image_ypos[0]))
-            screen.blit(self.bg_image_list[1], ((x * self.bg_width) - self.bg_scroll * 0.6, self.bg_image_ypos[1]))
-            screen.blit(self.bg_image_list[2], ((x * self.bg_width) - self.bg_scroll * 0.7, self.bg_image_ypos[2]))
-            screen.blit(self.bg_image_list[3], ((x * self.bg_width) - self.bg_scroll * 0.8, self.bg_image_ypos[3]))
+            screen.blit(self.bg_images[0], ((x * self.bg_width) - self.bg_scroll * 0.5, self.bg_ypos[0]))
+            screen.blit(self.bg_images[1], ((x * self.bg_width) - self.bg_scroll * 0.6, self.bg_ypos[1]))
+            screen.blit(self.bg_images[2], ((x * self.bg_width) - self.bg_scroll * 0.7, self.bg_ypos[2]))
+            screen.blit(self.bg_images[3], ((x * self.bg_width) - self.bg_scroll * 0.8, self.bg_ypos[3]))
 
-        for obstacle_tile in self._obstacle_group:
-            obstacle_tile.draw(screen, self.screen_scroll)
-        for water_tile in self._water_group:
-            water_tile.draw(screen, self.screen_scroll)
-        for exit_tile in self._exit_group:
-            exit_tile.draw(screen, self.screen_scroll)        
-        for decoration_tile in self._decoration_group:
-            decoration_tile.draw(screen, self.screen_scroll)
-        for item_tile in self._item_group:
-            item_tile.draw(screen, self.screen_scroll)
-        for bullet_tile in self._bullet_group:
-            bullet_tile.draw(screen, self.screen_scroll)
-        for grenade_tile in self._grenade_group:
-            grenade_tile.draw(screen, self.screen_scroll)
-        for explosion_tile in self._explosion_group:
-            explosion_tile.draw(screen, self.screen_scroll)
-        for enemy in self._enemy_group:
-            enemy.draw(screen, self.screen_scroll)
-        self.player.draw(screen, self.screen_scroll)
+        # Draw the world
+        for tile in self._obstacle_group:
+            tile.draw(screen, self.camera_scroll)
+        for tile in self._water_group:
+            tile.draw(screen, self.camera_scroll)
+        for tile in self._exit_group:
+            tile.draw(screen, self.camera_scroll)        
+        for tile in self._decoration_group:
+            tile.draw(screen, self.camera_scroll)
+        for tile in self._item_group:
+            tile.draw(screen, self.camera_scroll)
+        for tile in self._bullet_group:
+            tile.draw(screen, self.camera_scroll)
+        for tile in self._grenade_group:
+            tile.draw(screen, self.camera_scroll)
+        for tile in self._explosion_group:
+            tile.draw(screen, self.camera_scroll)
+
+        # Draw the soldiers
+        for tile in self._enemy_group:
+            tile.draw(screen, self.camera_scroll)
+        self.player.draw(screen, self.camera_scroll)
 
         # Draw the status bars
         self.health_bar.draw(screen, self.player.health)
         self.draw_text(screen, f'GRENADES: {self.player.grenades}', WHITE, 10, 35)
         self.draw_text(screen, f'ROUNDS: {self.player.ammo}', WHITE, 10, 60)
-        self.draw_text(screen, f'HEALTH: {self.player.health}', WHITE, 10, 85)
+
+
+    def draw_text(self, screen, text, color, x, y):
+        img = self._font.render(text, True, color)
+        screen.blit(img, (x, y))
 
 
 class Obstacle(pygame.sprite.Sprite):
@@ -280,8 +299,7 @@ class Obstacle(pygame.sprite.Sprite):
         pass
 
     def draw(self, screen, screen_scroll):
-        self.rect.x += screen_scroll
-        screen.blit(self.image, self.rect)
+        screen.blit(self.image, (self.rect.x + screen_scroll, self.rect.y))
 
 
 class Water(pygame.sprite.Sprite):
@@ -295,8 +313,7 @@ class Water(pygame.sprite.Sprite):
         pass
 
     def draw(self, screen, screen_scroll):
-        self.rect.x += screen_scroll
-        screen.blit(self.image, self.rect)
+        screen.blit(self.image, (self.rect.x + screen_scroll, self.rect.y))
 
 
 
@@ -311,8 +328,7 @@ class Decoration(pygame.sprite.Sprite):
         pass
 
     def draw(self, screen, screen_scroll):
-        self.rect.x += screen_scroll
-        screen.blit(self.image, self.rect)
+        screen.blit(self.image, (self.rect.x + screen_scroll, self.rect.y))
 
 
 
@@ -327,6 +343,5 @@ class Exit(pygame.sprite.Sprite):
         pass
 
     def draw(self, screen, screen_scroll):
-        self.rect.x += screen_scroll
-        screen.blit(self.image, self.rect)
+        screen.blit(self.image, (self.rect.x + screen_scroll, self.rect.y))
  

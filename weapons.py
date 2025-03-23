@@ -20,8 +20,8 @@ class ItemBox(pygame.sprite.Sprite):
         pass
 
     def draw(self, screen, screen_scroll):
-        self.rect.x += screen_scroll
-        screen.blit(self.image, self.rect)
+        screen.blit(self.image, (self.rect.x + screen_scroll, self.rect.y))
+
 
 
 class Bullet(pygame.sprite.Sprite):
@@ -41,8 +41,8 @@ class Bullet(pygame.sprite.Sprite):
         self.rect.x += self.speed * self.direction.value
 
     def draw(self, screen, screen_scroll):
-        self.rect.x += screen_scroll
-        screen.blit(self.image, self.rect)
+        screen.blit(self.image, (self.rect.x + screen_scroll, self.rect.y))
+
 
 
 class Grenade(pygame.sprite.Sprite):
@@ -84,8 +84,7 @@ class Grenade(pygame.sprite.Sprite):
         self.fuse_timer -= 1
 
     def draw(self, screen, screen_scroll):
-        self.rect.x += screen_scroll
-        screen.blit(self.image, self.rect)
+        screen.blit(self.image, (self.rect.x + screen_scroll, self.rect.y))
 
 
 class Explosion(pygame.sprite.Sprite):
@@ -120,5 +119,5 @@ class Explosion(pygame.sprite.Sprite):
                 self.image = self.frames[self.frame_idx]
 
     def draw(self, screen, screen_scroll):
-        self.rect.x += screen_scroll
-        screen.blit(self.image, self.rect)
+        screen.blit(self.image, (self.rect.x + screen_scroll, self.rect.y))
+

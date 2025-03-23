@@ -131,7 +131,7 @@ class Soldier(pygame.sprite.Sprite):
 
         # Handle vertical movement
         if jump == True and self.in_air == False:
-            self.vel_y = -11
+            self.vel_y = -12
             self.in_air = True
 
         # Handle lateral movement
@@ -180,8 +180,7 @@ class Soldier(pygame.sprite.Sprite):
 
     def draw(self, screen, screen_scroll):
         img = pygame.transform.flip(self.image, self.flip, False)
-        self.rect.x += screen_scroll
-        screen.blit(img, self.rect)
+        screen.blit(img, (self.rect.x + screen_scroll, self.rect.y))
 
     
 
