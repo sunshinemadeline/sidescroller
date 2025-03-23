@@ -3,7 +3,7 @@ from os.path import exists
 import csv
 import pygame
 from pygame.sprite import spritecollide
-from soldier import Player, Enemy, HealthBar
+from soldier import Player, Enemy, HealthBar, Action
 import weapons
 from settings import (BG_COLOR, WHITE, RED, GREEN,
                       SCREEN_HEIGHT, SCREEN_WIDTH, SCROLL_RIGHT, SCROLL_LEFT,
@@ -18,13 +18,13 @@ pygame.mixer.music.load('audio/music.mp3')
 pygame.mixer.music.set_volume(0.3)
 pygame.mixer.music.play(-1, 0.0, 2500)
 
-class World():
-    def __init__(self):
+class GameEngine():
+    def __init__(self, game_state='new'):
         '''
         Creates a new world object.
         '''
 
-        # Starting level
+        self.game_state = game_state
         self._current_level = 1
         
         # Background tiles
@@ -159,7 +159,7 @@ class World():
             self._exit_group.add(exit_tile)        
 
 
-    def load_game_level(self, level=None):
+    def load_game_level(self, level=None) -> Player:
         '''
         Loads the starting world state for the given level.
         '''
@@ -188,9 +188,41 @@ class World():
                 if tile >= 0: # -1 is an empty space
                     self.load_game_tile(tile, idx_x, idx_y)
         
-        # Nothing really to return here
-        return True
+        return self.player
     
+    def player_actions(self, controller):
+        if self.player.alive:
+            if controller.shoot and self.player.ammo > 0 and self.player.shoot_cooldown == 0:
+                bullet = self.player.shoot()
+                self.bullet_group.add(bullet)
+            if controller.throw and self.player.grenades > 0 and self.player.grenade_cooldown == 0:
+                grenade = self.player.throw()
+                self.grenade_group.add(grenade)
+
+            self.player.move(controller.mleft, controller.mright, controller.jump)
+
+            # Handle player animations
+            if self.player.in_air:
+                self.player.update(Action.JUMP)
+            elif (controller.mleft and not controller.mright 
+                or controller.mright and not controller.mleft):
+                self.player.update(Action.RUN)
+            else:
+                self.player.update(Action.IDLE)
+
+    def enemy_actions(self):
+        # Handle enemy AI controls
+        for enemy in self.enemy_group:
+            if enemy.alive:
+                if (self.player.alive 
+                        and enemy.vision.colliderect(self.player.rect)
+                        and enemy.ammo > 0 
+                        and enemy.shoot_cooldown == 0):
+                    bullet = enemy.ai_shoot()
+                    self.bullet_group.add(bullet)
+                enemy.ai_move()
+                if enemy.health <= 0:
+                    enemy.death()
 
     def collect_item_boxes(self):
         ''' 
@@ -237,13 +269,21 @@ class World():
                     enemy_damage = grenade.damage_at(enemy.rect)
                     enemy.health -= enemy_damage
 
-    def update(self):
+    def check_for_player_death(self):
+        if (self.player.health <= 0 
+                or self.player.rect.top > SCREEN_HEIGHT
+                or spritecollide(self.player, self.water_group, False)):
+            self.player.death()
+
+    def update(self, controller):
         
         # Update based on the player's movements
+        self.player_actions(controller)
         self.update_physics(self.player)
         self.update_scrolling()
 
         # Update all of the other items
+        self.enemy_actions()
         for enemy in self.enemy_group:
             self.update_physics(enemy)
         for grenade in self.grenade_group:
@@ -261,7 +301,7 @@ class World():
         self.collect_item_boxes()
         self.handle_bullet_damage()
         self.make_grenades_explode()
-
+        self.check_for_player_death()
 
     def update_scrolling(self):
         # If the player is moving too far right or left, scroll the screen

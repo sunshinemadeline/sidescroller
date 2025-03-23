@@ -1,25 +1,25 @@
 import pygame
-from enum import Enum
 
 pygame.init()
 pygame.mixer.init()
 
 # Rest of the imports
-from button import Button
+from button import GuiButton, ScreenFade, FadeType
+from controller import Controller
 from settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS            # type: ignore
 from settings import BG_COLOR, PINK, BLACK                       # type: ignore
-from world import World                                          # type: ignore
-import soldier
-import weapons                                                   # type: ignore
-from pygame.sprite import spritecollide
+from world import GameEngine                                     # type: ignore
 
-# Create the window
+
+# Create IO devices: controller for input and graphic screen for output
+controller = Controller()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Shooter')
 
+
 # Create the main menu
-start_button = Button('img/start_btn.png', SCREEN_WIDTH // 2 - 130, SCREEN_HEIGHT //2 - 150)
-exit_button = Button('img/exit_btn.png', SCREEN_WIDTH // 2 - 110, SCREEN_HEIGHT //2 + 50)
+start_button = GuiButton('img/start_btn.png', SCREEN_WIDTH // 2 - 130, SCREEN_HEIGHT //2 - 150)
+exit_button = GuiButton('img/exit_btn.png', SCREEN_WIDTH // 2 - 110, SCREEN_HEIGHT //2 + 50)
 DEATH_EVENT = pygame.USEREVENT + 1
 LEVEL_EVENT = pygame.USEREVENT + 2
 
@@ -28,168 +28,102 @@ clock = pygame.time.Clock()
 
 
 
-class Fadetype(Enum):
-    STARTLEVEL = 0
-    ENDLEVEL = 1
-    PLAYERDEATH = 2
-
-class ScreenFade():
-    def __init__(self, fade_type, color, speed):
-        '''
-        direction = 1 is whole screen
-        direction = 2 is vertical
-        '''
-        self.fade_type = fade_type
-        self.color = color
-        self.speed = speed
-        self.counter = 0
-        self.finished = True
-
-    def begin_fade(self):
-        self.counter = 0
-        self.finished = False
-
-    def draw_fade(self, screen):
-        # Three types of fades
-        if self.fade_type == Fadetype.STARTLEVEL:
-            #if self.counter <= SCREEN_WIDTH:
-            self.counter += self.speed
-            pygame.draw.rect(screen, self.color, (0 - self.counter, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT))
-            pygame.draw.rect(screen, self.color, (SCREEN_WIDTH // 2 + self.counter, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT))
-            pygame.draw.rect(screen, self.color, (0, 0 - self.counter, SCREEN_WIDTH, SCREEN_HEIGHT // 2))
-            pygame.draw.rect(screen, self.color, (0, SCREEN_HEIGHT // 2 + self.counter, SCREEN_WIDTH, SCREEN_HEIGHT // 2))
-        
-        elif self.fade_type == Fadetype.ENDLEVEL:
-            #if self.counter <= SCREEN_WIDTH:
-            self.counter += self.speed
-            pygame.draw.rect(screen, self.color, (0, 0, self.counter, SCREEN_HEIGHT))
-            pygame.draw.rect(screen, self.color, (SCREEN_WIDTH - self.counter, 0, SCREEN_WIDTH // 2 - self.counter, SCREEN_HEIGHT))
-            pygame.draw.rect(screen, self.color, (0, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT))
-            pygame.draw.rect(screen, self.color, (0, SCREEN_HEIGHT - self.counter, SCREEN_WIDTH, self.counter))
-
-        elif self.fade_type == Fadetype.PLAYERDEATH:
-            #if self.counter <= SCREEN_HEIGHT:
-            self.counter += self.speed
-            pygame.draw.rect(screen, self.color, (0, 0, SCREEN_WIDTH, self.counter))
-        
-        if self.counter >= SCREEN_WIDTH:
-            self.finished = True
+intro_fade = ScreenFade(FadeType.STARTLEVEL, BLACK, 5)
+level_fade = ScreenFade(FadeType.ENDLEVEL, BLACK, 5)
+death_fade = ScreenFade(FadeType.PLAYERDEATH, PINK, 5)
 
 
-intro_fade = ScreenFade(Fadetype.STARTLEVEL, BLACK, 5)
-level_fade = ScreenFade(Fadetype.ENDLEVEL, BLACK, 5)
-death_fade = ScreenFade(Fadetype.PLAYERDEATH, PINK, 5)
 
-
-# Global keyboard action events
-mleft_key = False
-mright_key = False
-jump_key = False
-shoot_key = False
-throw_key = False
-
-def handle_player_keyboard_events(event: pygame.event.Event) -> None:
+def handle_player_keyboard_events(event: pygame.event.Event, 
+                                  controller: Controller) -> Controller:
     ''' 
-    Process player keystrokes and set the global action variables accordingly.
+    Process player keystrokes and returns the current button combination.
     '''
-    global mleft_key, mright_key, jump_key, shoot_key, throw_key
+
+    # Find which keys have been pressed
     if event.type == pygame.KEYDOWN:
         if event.key == pygame.K_a:
-            mleft_key = True
+            controller.mleft = True
         if event.key == pygame.K_d:
-            mright_key = True
+            controller.mright = True
         if event.key == pygame.K_w:
-            jump_key = True
+            controller.jump = True
         if event.key == pygame.K_SPACE:
-            shoot_key = True
+            controller.shoot = True
         if event.key == pygame.K_q:
-            throw_key = True
+            controller.throw = True
+
+    # Find which keys have been released
     if event.type == pygame.KEYUP:
         if event.key == pygame.K_a:
-            mleft_key = False
+            controller.mleft = False
         if event.key == pygame.K_d:
-            mright_key = False
+            controller.mright = False
         if event.key == pygame.K_w:
-            jump_key = False
+            controller.jump = False
         if event.key == pygame.K_SPACE:
-            shoot_key = False    
+            controller.shoot = False    
         if event.key == pygame.K_q:
-            throw_key = False
-    return
+            controller.throw = False
+    
+    # Return the current state of the controller
+    return controller
 
 
 
-def run_main_menu():
+def run_main_menu(engine, controller, screen):
+    '''
+    Displays the main menu. This interface is the primary method for human
+    players to click on a button and start a new, interactive game.
+    '''
 
-    global game_state, game_running
+    # Draw the main menu
     screen.fill(BG_COLOR)
     start_button.draw(screen)
     exit_button.draw(screen)
 
+    # Handle button clicks
     if start_button.is_clicked():
-        game_state = "interactive"
+        engine.game_state = 'interactive'
+        engine.load_game_level()
         intro_fade.begin_fade()
     if exit_button.is_clicked():
-        game_running = False
+        engine.game_state = 'quit'
 
-    # Handle the various inputs to the game
+    # Handle the various ways to quit game
     for event in pygame.event.get():
         if (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
                 or event.type == pygame.QUIT):
-            game_running = False
+            engine.game_state = 'quit'
+
+    # Nothing particularly important to return
+    return None
 
 
 
-def run_interactive_game():
+def run_interactive_game(engine, controller, screen):
 
-    global game_state, game_running
     global level_timer, death_timer
-    global world, player
-
-    # Updates all sprites that are governed by the physics engine
-    if player.alive:
-        if shoot_key and player.ammo > 0 and player.shoot_cooldown == 0:
-            bullet = player.shoot()
-            world.bullet_group.add(bullet)
-        if throw_key and player.grenades > 0 and player.grenade_cooldown == 0:
-            grenade = player.throw()
-            world.grenade_group.add(grenade)
-
-        player.move(mleft_key, mright_key, jump_key)
-
-        # Handle player animations
-        if player.in_air:
-            player.update(soldier.Action.JUMP)
-        elif (mleft_key and not mright_key 
-            or mright_key and not mleft_key):
-            player.update(soldier.Action.RUN)
-        else:
-            player.update(soldier.Action.IDLE)
-
 
     # Update the position of all physics-controlled sprites
-    world.update()
+    engine.update(controller)
+    engine.draw(screen)
 
-    world.draw(screen)
-
+    # Special case #1: begin a new level
     if not intro_fade.finished:
         intro_fade.draw_fade(screen)
 
-    # Check for player death
-    if (player.health <= 0 
-            or player.rect.top > SCREEN_HEIGHT
-            or spritecollide(player, world.water_group, False)):
+    # Special case #2: player dies, next level
+    if not engine.player.alive:
         if not death_timer:
             death_timer = True
             death_fade.begin_fade()
             pygame.time.set_timer(DEATH_EVENT, 3000)
         if not death_fade.finished:
             death_fade.draw_fade(screen)
-        player.death()
-
 
     # Handle player levels up
-    if pygame.sprite.spritecollideany(world.player, world.exit_group):
+    if pygame.sprite.spritecollideany(engine.player, engine.exit_group):
         if not level_timer:
             level_timer = True
             level_fade.begin_fade()
@@ -197,65 +131,46 @@ def run_interactive_game():
         if not level_fade.finished:
             level_fade.draw_fade(screen)
 
-
-
-    # Handle enemy AI controls
-    for enemy in world.enemy_group:
-        if enemy.alive:
-            if (player.alive 
-                    and enemy.vision.colliderect(player.rect)
-                    and enemy.ammo > 0 
-                    and enemy.shoot_cooldown == 0):
-                bullet = enemy.ai_shoot()
-                world.bullet_group.add(bullet)
-            enemy.ai_move()
-            if enemy.health <= 0:
-                enemy.death()
-
     # Handle the various inputs to the game
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            game_running = False
+            engine.game_state = 'quit'
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            game_running = False
+            engine.game_state = 'quit'
         elif event.type == DEATH_EVENT:
-            world.reset_world()
-            world.load_game_level()
-            player = world.player
+            engine.reset_world()
+            engine.load_game_level()
             death_timer = False            
-            game_state = "menu"
+            engine.game_state = "menu"
             pygame.time.set_timer(DEATH_EVENT, 0)
         elif event.type == LEVEL_EVENT:
-            world._current_level += 1
-            world.reset_world()
-            world.load_game_level()
-            player = world.player
+            engine._current_level += 1
+            engine.reset_world()
+            engine.load_game_level()
             level_timer = False
-            game_state = "interactive"
+            engine.game_state = "interactive"
             intro_fade.begin_fade()
             pygame.time.set_timer(LEVEL_EVENT, 0)
 
-        handle_player_keyboard_events(event)
+        controller = handle_player_keyboard_events(event, controller)
 
 
 
 if __name__ == '__main__':
 
-    # World variables including a shortcut for the player
-    world = World()
-    world.load_game_level()
-    player = world.player
-
+    # Global variables for the game
     death_timer = False
     level_timer = False
-    game_state = 'menu'
-    game_running = True
-    while game_running:
-        if game_state == 'menu':
-            run_main_menu()
-        elif game_state == 'interactive':
-            run_interactive_game()
+
+    # The main game loop has several states, each handled separately:
+    #   1. 'Menu' where the player can choose between options
+    #   2. 'Interactive' where a human player plays the game
+    engine = GameEngine(game_state='menu')
+    while engine.game_state != 'quit':
+        if engine.game_state == 'menu':
+            run_main_menu(engine, controller, screen)
+        elif engine.game_state == 'interactive':
+            run_interactive_game(engine, controller, screen)
         clock.tick(FPS)
         pygame.display.flip()
-
     pygame.quit()
