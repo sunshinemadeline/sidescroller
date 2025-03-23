@@ -9,7 +9,6 @@ from settings import TILE_SIZE, WHITE, RED, GREEN
 # All soldiers share these common animation types
 animation_types = ['Idle', 'Run', 'Jump', 'Death']
 
-
 class HealthBar():
     '''
     Graphic to visualize the player's health as a green/red rectangle.
@@ -55,7 +54,9 @@ def init():
             image_list.append(img)
         Enemy.animation_images.append(image_list)
 
-        
+
+fx_jump = pygame.mixer.Sound('audio/jump.wav')
+fx_jump.set_volume(0.5)
 
 class Soldier(pygame.sprite.Sprite):
     def __init__(self, x, y, type='player', scale=2, speed=5, health=100, ammo=20, grenades=5):
@@ -139,6 +140,7 @@ class Soldier(pygame.sprite.Sprite):
 
         # Handle vertical movement
         if jump == True and self.in_air == False:
+            fx_jump.play()
             self.vel_y = -12
             self.in_air = True
 

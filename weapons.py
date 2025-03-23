@@ -1,8 +1,11 @@
 
 import pygame
 from os import listdir
-from settings import GRAVITY, Direction
 
+fx_shot = pygame.mixer.Sound('audio/shot.wav')
+fx_shot.set_volume(0.4)
+fx_grenade = pygame.mixer.Sound('audio/grenade.wav')
+fx_grenade.set_volume(1)
 
 class ItemBox(pygame.sprite.Sprite):
     ''' Supplies for the player to collect with ammo, grenades, or health. '''
@@ -36,6 +39,7 @@ class Bullet(pygame.sprite.Sprite):
         self.image = self.image.convert_alpha()
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
+        fx_shot.play()
 
     def update(self):
         self.rect.x += self.speed * self.direction.value
@@ -106,6 +110,7 @@ class Explosion(pygame.sprite.Sprite):
         self.image = self.frames[self.frame_idx]
         self.rect = self.frames[self.frame_idx].get_rect()
         self.rect.center = (x, y)
+        fx_grenade.play()
 
     def update(self):
         ANIMATION_COOLDOWN = 4

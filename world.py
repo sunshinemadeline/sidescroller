@@ -13,6 +13,11 @@ from settings import (BG_COLOR, WHITE, RED, GREEN,
                       GRENADE_TILE_ID, HEALTH_TILE_ID, LEVEL_EXIT_TILE_ID,
                       GRAVITY, Direction)
 
+# Intialize sound
+pygame.mixer.music.load('audio/music.mp3')
+pygame.mixer.music.set_volume(0.3)
+pygame.mixer.music.play(-1, 0.0, 2500)
+
 class World():
     def __init__(self):
         '''
