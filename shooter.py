@@ -1,41 +1,29 @@
-import pygame
 
+# Initialize the display and sound before importing any other modules
+import pygame
+from settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
 pygame.init()
 pygame.mixer.init()
-
-# Rest of the imports
-from button import GuiButton, ScreenFade, FadeType
-from controller import Controller
-from settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS            # type: ignore
-from settings import BG_COLOR, PINK, BLACK                       # type: ignore
-from world import GameEngine                                     # type: ignore
-
-
-# Create IO devices: controller for input and graphic screen for output
-controller = Controller()
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Shooter')
 
+# Now import the other modules, which may depend on the mixer and display
+from controller import GameController
+from widgets import GameButton, GameFade, FadeType, BG_COLOR, PINK, BLACK
+from engine import GameEngine
 
-# Create the main menu
-start_button = GuiButton('img/start_btn.png', SCREEN_WIDTH // 2 - 130, SCREEN_HEIGHT //2 - 150)
-exit_button = GuiButton('img/exit_btn.png', SCREEN_WIDTH // 2 - 110, SCREEN_HEIGHT //2 + 50)
-DEATH_EVENT = pygame.USEREVENT + 1
-LEVEL_EVENT = pygame.USEREVENT + 2
-
-# Required to set the frame rate
+# Create IO devices:
+#  1) controller for input
+#  2) graphic display for output
+#  3) a clock to keep time
+controller = GameController()
+engine = GameEngine()
+screen = pygame.display.get_surface()
 clock = pygame.time.Clock()
 
 
-
-intro_fade = ScreenFade(FadeType.STARTLEVEL, BLACK, 5)
-level_fade = ScreenFade(FadeType.ENDLEVEL, BLACK, 5)
-death_fade = ScreenFade(FadeType.PLAYERDEATH, PINK, 5)
-
-
-
-def handle_player_keyboard_events(event: pygame.event.Event, 
-                                  controller: Controller) -> Controller:
+def handle_keyboard_events(event: pygame.event.Event, 
+                           controller: GameController) -> GameController:
     ''' 
     Process player keystrokes and returns the current button combination.
     '''
@@ -71,7 +59,9 @@ def handle_player_keyboard_events(event: pygame.event.Event,
 
 
 
-def run_main_menu(engine, controller, screen):
+def run_main_menu(engine: GameEngine, 
+                  controller: GameController, 
+                  screen: pygame.Surface) -> None:
     '''
     Displays the main menu. This interface is the primary method for human
     players to click on a button and start a new, interactive game.
@@ -101,7 +91,9 @@ def run_main_menu(engine, controller, screen):
 
 
 
-def run_interactive_game(engine, controller, screen):
+def run_interactive_game(engine: GameEngine, 
+                         controller: GameController, 
+                         screen: pygame.Surface) -> None:
 
     global level_timer, death_timer
 
@@ -113,7 +105,7 @@ def run_interactive_game(engine, controller, screen):
     if not intro_fade.finished:
         intro_fade.draw_fade(screen)
 
-    # Special case #2: player dies, next level
+    # Special case #2: player dies, restart same level
     if not engine.player.alive:
         if not death_timer:
             death_timer = True
@@ -122,7 +114,7 @@ def run_interactive_game(engine, controller, screen):
         if not death_fade.finished:
             death_fade.draw_fade(screen)
 
-    # Handle player levels up
+    # Special case #3: player advances to the next level
     if pygame.sprite.spritecollideany(engine.player, engine.exit_group):
         if not level_timer:
             level_timer = True
@@ -131,7 +123,7 @@ def run_interactive_game(engine, controller, screen):
         if not level_fade.finished:
             level_fade.draw_fade(screen)
 
-    # Handle the various inputs to the game
+    # Handle the various controller inputs to the game
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             engine.game_state = 'quit'
@@ -152,7 +144,10 @@ def run_interactive_game(engine, controller, screen):
             intro_fade.begin_fade()
             pygame.time.set_timer(LEVEL_EVENT, 0)
 
-        controller = handle_player_keyboard_events(event, controller)
+        controller = handle_keyboard_events(event, controller)
+
+    # Nothing particularly important to return
+    return None
 
 
 
@@ -162,10 +157,27 @@ if __name__ == '__main__':
     death_timer = False
     level_timer = False
 
+    # Create the buttons for use on the main menudisplay
+    start_button_img = pygame.image.load('img/start_btn.png').convert_alpha()
+    start_button_x = SCREEN_WIDTH // 2 - start_button_img.rect.width
+    start_button_y = SCREEN_HEIGHT // 2 - start_button_img.rect.height - 100
+    start_button = GameButton(start_button_img, start_button_x, start_button_y)
+    exit_button_img = pygame.image.load('img/exit_btn.png').convert_alpha()
+    exit_button_x = SCREEN_WIDTH // 2 - exit_button_img.rect.width
+    exit_button_y = SCREEN_HEIGHT // 2 - exit_button_img.rect.height - 100
+    exit_button = GameButton('img/exit_btn.png', exit_button_x, exit_button_y)
+
+    # Define notable game events and their transitions
+    INTRO_EVENT = pygame.USEREVENT + 1
+    LEVEL_EVENT = pygame.USEREVENT + 2
+    DEATH_EVENT = pygame.USEREVENT + 3
+    intro_fade = GameFade(FadeType.INTRO_EVENT, BLACK)
+    level_fade = GameFade(FadeType.LEVEL_EVENT, BLACK)
+    death_fade = GameFade(FadeType.DEATH_EVENT, PINK)
+
     # The main game loop has several states, each handled separately:
     #   1. 'Menu' where the player can choose between options
     #   2. 'Interactive' where a human player plays the game
-    engine = GameEngine(game_state='menu')
     while engine.game_state != 'quit':
         if engine.game_state == 'menu':
             run_main_menu(engine, controller, screen)

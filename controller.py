@@ -1,5 +1,5 @@
 
-class Controller():
+class GameController():
     '''
     Logical representation of a game controller with a flag for each button
     '''
