@@ -2,9 +2,9 @@
 from os.path import exists
 import csv
 import pygame
-from pygame.sprite import spritecollideany
+from pygame.sprite import spritecollide
 from soldier import Player, Enemy, HealthBar
-from weapons import ItemBox                                       # type: ignore
+import weapons
 from settings import (BG_COLOR, WHITE, RED, GREEN,
                       SCREEN_HEIGHT, SCREEN_WIDTH, SCROLL_RIGHT, SCROLL_LEFT,
                       TILE_SIZE, TILE_TYPE_COUNT,
@@ -146,13 +146,13 @@ class World():
             enemy = Enemy(rect.x, rect.y, 'enemy', 1.65, 2)
             self._enemy_group.add(enemy)
         elif tile == AMMO_TILE_ID:
-            item = ItemBox(rect.x, rect.y, 'ammo')
+            item = weapons.ItemBox(rect.x, rect.y, 'ammo')
             self._item_group.add(item)
         elif tile == GRENADE_TILE_ID:
-            item = ItemBox(rect.x, rect.y, 'grenade')
+            item = weapons.ItemBox(rect.x, rect.y, 'grenade')
             self._item_group.add(item)
         elif tile == HEALTH_TILE_ID:
-            item = ItemBox(rect.x, rect.y, 'health')
+            item = weapons.ItemBox(rect.x, rect.y, 'health')
             self._item_group.add(item)
         elif tile == LEVEL_EXIT_TILE_ID: # level exit
             exit_tile = Exit(img, rect.x, rect.y)
@@ -192,6 +192,51 @@ class World():
         return True
     
 
+    def collect_item_boxes(self):
+        ''' 
+        Check if player collected any item boxes and add to inventory.
+        '''
+        for item in spritecollide(self.player, self.item_group, True):
+            if item.box_type == 'ammo':
+                amount = self.player.ammo + item.quantity
+                self.player.ammo += min(amount, self.player.max_ammo)
+            elif item.box_type == 'grenade':
+                amount = self.player.grenades + item.quantity
+                self.player.grenades += min(amount, self.player.max_grenades)
+            elif item.box_type == 'health':
+                amount = self.player.health + item.quantity
+                self.player.health = min(amount, self.player.max_health)
+
+    def handle_bullet_damage(self):
+        '''
+        Check for bullet hit damage and injure soldier accordingly.
+        '''
+        for bullet in spritecollide(self.player, self.bullet_group, True):
+            self.player.health -= bullet.damage
+        for enemy in self.enemy_group:
+            for bullet in spritecollide(enemy, self.bullet_group, False):
+                enemy.health -= bullet.damage
+                if enemy.health >= 0:
+                    bullet.kill()        
+
+    def make_grenades_explode(self):
+        '''
+        Check for exploding grenades and initiate animation.
+        '''
+        for grenade in self.grenade_group:
+            if grenade.fuse_timer <= 0:
+                # Animate with an explosion
+                explosion = weapons.Explosion(grenade.rect.x, grenade.rect.y, 0.75)
+                self.explosion_group.add(explosion)
+                grenade.kill()
+                # Calculate damage against player
+                player_damage = grenade.damage_at(self.player.rect)
+                self.player.health -= player_damage
+                # Calcualte damage against each enemy
+                for enemy in self.enemy_group:
+                    enemy_damage = grenade.damage_at(enemy.rect)
+                    enemy.health -= enemy_damage
+
     def update(self):
         
         # Update based on the player's movements
@@ -212,6 +257,10 @@ class World():
                 bullet.kill()
         self.grenade_group.update()
         self.explosion_group.update()
+
+        self.collect_item_boxes()
+        self.handle_bullet_damage()
+        self.make_grenades_explode()
 
 
     def update_scrolling(self):
