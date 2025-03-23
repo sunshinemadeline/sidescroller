@@ -5,7 +5,7 @@ from pygame.sprite import spritecollideany
 from soldier import Player, Enemy, HealthBar
 from weapons import ItemBox                                       # type: ignore
 from settings import (BG_COLOR, WHITE, RED, GREEN,
-                      SCREEN_HEIGHT, SCREEN_WIDTH, SCROLL_THRESHOLD,
+                      SCREEN_HEIGHT, SCREEN_WIDTH, SCROLL_RIGHT, SCROLL_LEFT,
                       TILE_SIZE, TILE_TYPE_COUNT, ROWS, COLS,
                       DIRT_TILE_LAST, WATER_TILE_LAST, DECORATION_TILE_LAST,
                       PLAYER_TILE_ID, ENEMY_TILE_ID, AMMO_TILE_ID,
@@ -192,9 +192,10 @@ class World():
     def update_scrolling(self):
         # If the player is moving too far right or left, scroll the screen
         if ((self._player.direction == Direction.RIGHT 
-                and self._player.rect.right >= SCREEN_WIDTH - SCROLL_THRESHOLD)
+                and self._player.rect.right + self.camera_scroll >= SCROLL_RIGHT)
             or (self._player.direction == Direction.LEFT 
-                and self._player.rect.left + self.camera_scroll < SCROLL_THRESHOLD)):
+                and self._player.rect.left + self.camera_scroll < SCROLL_LEFT)):
+            #print(self.player.rect.right, -self.camera_scroll + SCREEN_WIDTH - SCROLL_THRESHOLD)
             self.camera_scroll -= self.player.dx
             self.bg_scroll += self.player.dx
         else:
