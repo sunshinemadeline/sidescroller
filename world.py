@@ -1,4 +1,5 @@
 
+from os.path import exists
 import csv
 import pygame
 from pygame.sprite import spritecollideany
@@ -6,30 +7,22 @@ from soldier import Player, Enemy, HealthBar
 from weapons import ItemBox                                       # type: ignore
 from settings import (BG_COLOR, WHITE, RED, GREEN,
                       SCREEN_HEIGHT, SCREEN_WIDTH, SCROLL_RIGHT, SCROLL_LEFT,
-                      TILE_SIZE, TILE_TYPE_COUNT, ROWS, COLS,
+                      TILE_SIZE, TILE_TYPE_COUNT,
                       DIRT_TILE_LAST, WATER_TILE_LAST, DECORATION_TILE_LAST,
                       PLAYER_TILE_ID, ENEMY_TILE_ID, AMMO_TILE_ID,
                       GRENADE_TILE_ID, HEALTH_TILE_ID, LEVEL_EXIT_TILE_ID,
                       GRAVITY, Direction)
 
-
 class World():
     def __init__(self):
-        self._tile_img_list = []
-        self._player = None
-        self._health_bar = None
-        self._obstacle_group = pygame.sprite.Group()
-        self._water_group = pygame.sprite.Group()
-        self._decoration_group = pygame.sprite.Group()
-        self._exit_group = pygame.sprite.Group()
-        self._item_group = pygame.sprite.Group()
-        self._enemy_group = pygame.sprite.Group()
-        self._bullet_group = pygame.sprite.Group()
-        self._grenade_group = pygame.sprite.Group()
-        self._explosion_group = pygame.sprite.Group()
-        self._current_level = 1
+        '''
+        Creates a new world object.
+        '''
 
-        # Hardcoded background images and layout positions
+        # Starting level
+        self._current_level = 1
+        
+        # Background tiles
         self.bg_images = [
             pygame.image.load('img/background/sky_cloud.png').convert_alpha(),
             pygame.image.load('img/background/mountain.png').convert_alpha(),
@@ -43,16 +36,36 @@ class World():
             SCREEN_HEIGHT - self.bg_images[3].get_height()
         ]
         self.bg_width = min([img.get_width() for img in self.bg_images])
-        self.bg_scroll = 0
-        self.camera_scroll = 0
 
-        # Global fonts
-        self._font = pygame.font.SysFont('Futura', 30)
-
+        # Foreground tiles
+        self._tile_img_list = []
         for tile_num in range(TILE_TYPE_COUNT):
             img = pygame.image.load(f'img/tile/{tile_num}.png').convert_alpha()
             img = pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
             self._tile_img_list.append(img)
+
+        # Writing font
+        self._font = pygame.font.SysFont('Futura', 30)
+
+
+    def reset_world(self):
+        ''' 
+        Resets the sprites and camera for a new level
+        '''
+        self._player = None
+        self._health_bar = None
+        self._obstacle_group = pygame.sprite.Group()
+        self._water_group = pygame.sprite.Group()
+        self._decoration_group = pygame.sprite.Group()
+        self._exit_group = pygame.sprite.Group()
+        self._item_group = pygame.sprite.Group()
+        self._enemy_group = pygame.sprite.Group()
+        self._bullet_group = pygame.sprite.Group()
+        self._grenade_group = pygame.sprite.Group()
+        self._explosion_group = pygame.sprite.Group()
+        self.bg_scroll = 0
+        self.camera_scroll = 0
+
 
     @property
     def player(self):
@@ -148,27 +161,30 @@ class World():
         if level is None:
             level = self._current_level
 
-        # Create an empty tile list of the appropriate size for this level
-        world_data = []
-        for row in range(ROWS):
-            empty_row = [-1] * COLS
-            world_data.append(empty_row)
+        if not exists(f'level{level}_data.csv'):
+            print(f'Error: level {level} does not exist')
+            return False
+
+        self.reset_world()
 
         # Read the level data from a CSV file
+        world_data = []
         with open(f'level{level}_data.csv', 'r') as csvfile:
             reader = csv.reader(csvfile, delimiter=',')
             for idx_y, row_of_tiles in enumerate(reader):
+                world_data.append([])
                 for idx_x, tile_data in enumerate(row_of_tiles):
-                    world_data[idx_y][idx_x] = int(tile_data)
+                    world_data[idx_y].append(int(tile_data))
 
         # Populate the world by loading the appropriate game tile
-        for idx_y, row in enumerate(world_data):
-            for idx_x, tile in enumerate(row):
+        self.world_width = TILE_SIZE * len(world_data[0])
+        for idx_y, row_of_tiles in enumerate(world_data):
+            for idx_x, tile in enumerate(row_of_tiles):
                 if tile >= 0: # -1 is an empty space
                     self.load_game_tile(tile, idx_x, idx_y)
         
         # Nothing really to return here
-        return None
+        return True
     
 
     def update(self):
@@ -183,8 +199,12 @@ class World():
         for grenade in self.grenade_group:
             self.update_physics(grenade)
         self.item_group.update()
-        self.enemy_group.update()
+        self.enemy_group.update(False)
         self.bullet_group.update()
+        # Remove any bullet sprites that go past the end of the screen
+        for bullet in self.bullet_group:
+            if bullet.rect.right < 0 or bullet.rect.left + self.camera_scroll > SCREEN_WIDTH:
+                bullet.kill()
         self.grenade_group.update()
         self.explosion_group.update()
 
@@ -192,10 +212,11 @@ class World():
     def update_scrolling(self):
         # If the player is moving too far right or left, scroll the screen
         if ((self._player.direction == Direction.RIGHT 
-                and self._player.rect.right + self.camera_scroll >= SCROLL_RIGHT)
+                and self._player.rect.right + self.camera_scroll >= SCROLL_RIGHT
+                and self.bg_scroll + SCREEN_WIDTH < self.world_width)
             or (self._player.direction == Direction.LEFT 
-                and self._player.rect.left + self.camera_scroll < SCROLL_LEFT)):
-            #print(self.player.rect.right, -self.camera_scroll + SCREEN_WIDTH - SCROLL_THRESHOLD)
+                and self._player.rect.left + self.camera_scroll < SCROLL_LEFT
+                and self.bg_scroll > 0)):
             self.camera_scroll -= self.player.dx
             self.bg_scroll += self.player.dx
         else:
@@ -235,6 +256,11 @@ class World():
                     sprite.landed(sprite.vel_y)
                     sprite.dy = tile.rect.top - sprite.rect.bottom
                 sprite.vel_y = 0
+
+        # Check if player is going off the edge of the world
+        if (sprite.direction == Direction.RIGHT and sprite.rect.right >= self.world_width
+                or sprite.direction == Direction.LEFT and sprite.rect.left <= 0):
+            sprite.dx = 0
 
         # Move the sprite and return the distance
         sprite.rect.x += sprite.dx

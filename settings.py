@@ -18,7 +18,7 @@ FPS = 60
 # Gamemap tiles
 ROWS = 16
 COLS = 150
-TILE_SIZE = SCREEN_HEIGHT // ROWS
+TILE_SIZE = SCREEN_HEIGHT // ROWS # this should be defined for the size of images instead of hardcoded 16
 TILE_TYPE_COUNT = 21
 DIRT_TILE_FIRST = 0
 DIRT_TILE_LAST = 8

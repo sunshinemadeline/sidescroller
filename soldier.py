@@ -80,6 +80,7 @@ class Soldier(pygame.sprite.Sprite):
         self.in_air = True # TODO: should start False?
         self.jump = False
         self.flip = False
+        self.world_view = None
 
         # Action/Animation sprite related variables
         self.action = Action.IDLE
@@ -98,13 +99,20 @@ class Soldier(pygame.sprite.Sprite):
             self.animation_list.append(frame_list)
         self.image = self.animation_list[self.action.value][self.frame_idx]
         self.rect = self.image.get_rect()
+        # Adjusts the rectangle to be slightly smaller than image so that the player falls through tile gaps
+        self.rect.x += 3
+        self.rect.width -= 6
+        self.rect.y -= 1
+        self.rect.height -= 2
         self.rect.center = (x, y)
         #self.width = self.image.get_width()
         #self.height = self.image.get_height()
         self.update_time = pygame.time.get_ticks()
 
-    def update(self, new_action=None):
+    def update(self, world_view, new_action=None):
         ANIMATION_COOLDOWN = 100
+
+        self.world_view = world_view
         
         if new_action is not None and new_action != self.action:
             self.action = new_action
@@ -172,7 +180,7 @@ class Soldier(pygame.sprite.Sprite):
             return None
 
     def death(self):
-        self.update(Action.DEATH)
+        self.update(False, Action.DEATH)
         self.health = 0
         self.speed = 0
         self.vel_x = 0
@@ -218,15 +226,12 @@ class Enemy(Soldier):
         self.grenade_cooldown = 200
         return super().throw()
 
-    # TODO: This is only for computer soldiers, use inheritence
     def ai_shoot(self):
         self.update(Action.IDLE)
         self.idling = True
         self.idling_counter = random.randint(20, 40)
         return self.shoot()
-    
 
-    # TODO: This is only for computer soldiers, use inheritence
     def ai_move(self):
         if self.idling == False and random.randint(1, 1000) < 5:
             self.update(Action.IDLE)
@@ -241,9 +246,18 @@ class Enemy(Soldier):
         
         # handle movement
         else:
-            if self.direction == Direction.RIGHT:
+            #tile_x = self.rect.x // TILE_SIZE
+            #tile_y = self.rect.y // TILE_SIZE
+            #index_y = len(self.world_view) // 2
+            #index_x = len(self.world_view[0]) // 2
+            if (self.direction == Direction.RIGHT ):
+                    #and self.world_view[index_y][index_x+1] == -1
+                    #and self.world_view[index_y+1][index_x+1] != 1):
                 ai_moving_right = True
                 ai_moving_left = False
+            #elif (self.direction == Direction.LEFT 
+            #        and self.world_view[index_y][index_x-1] == -1
+            #        and self.world_view[index_y+1][index_x-1] != 1):
             else:
                 ai_moving_right = False
                 ai_moving_left = True
