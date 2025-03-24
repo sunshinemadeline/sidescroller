@@ -1,180 +1,136 @@
 
-from os.path import exists
 import csv
 import pygame
 from pygame.sprite import spritecollide
-from soldier import Player, Enemy, HealthBar, Action
-import weapons
-from settings import (BG_COLOR, WHITE, RED, GREEN,
-                      SCREEN_HEIGHT, SCREEN_WIDTH, SCROLL_RIGHT, SCROLL_LEFT,
+from os.path import exists
+from enum import Enum
+from soldier import Player, Enemy, Action
+from weapons import ItemBox, Explosion
+from settings import (SCREEN_HEIGHT, SCREEN_WIDTH, SCROLL_RIGHT, SCROLL_LEFT,
                       TILE_SIZE, TILE_TYPE_COUNT,
                       DIRT_TILE_LAST, WATER_TILE_LAST, DECORATION_TILE_LAST,
                       PLAYER_TILE_ID, ENEMY_TILE_ID, AMMO_TILE_ID,
                       GRENADE_TILE_ID, HEALTH_TILE_ID, LEVEL_EXIT_TILE_ID,
                       GRAVITY, Direction)
 
-# Intialize sound                                 # Todo: cleanup and move image loading to class variables
+# Todo: cleanup
+
+
+class GameModes(Enum):
+    MENU = 0,
+    INTERACTIVE = 1,
+    QUIT = 2,
+
+# Intialize sound
 pygame.mixer.music.load('audio/music.mp3')
 pygame.mixer.music.set_volume(0.3)
 pygame.mixer.music.play(-1, 0.0, 2500)
 
 class GameEngine():
-    def __init__(self, game_state='menu'):
+
+    # Background tiles
+    bg_img = [
+        pygame.image.load('img/background/sky_cloud.png').convert_alpha(),
+        pygame.image.load('img/background/mountain.png').convert_alpha(),
+        pygame.image.load('img/background/pine1.png').convert_alpha(),
+        pygame.image.load('img/background/pine2.png').convert_alpha()
+    ]
+    bg_ypos = [
+        0,
+        SCREEN_HEIGHT - bg_img[1].get_height() - 200,
+        SCREEN_HEIGHT - bg_img[2].get_height() - 150,
+        SCREEN_HEIGHT - bg_img[3].get_height()
+    ]
+    bg_width = min([img.get_width() for img in bg_img])
+
+    # Foreground tiles
+    tile_img_list = []
+    for tile_num in range(TILE_TYPE_COUNT):
+        img = pygame.image.load(f'img/tile/{tile_num}.png').convert_alpha()
+        img = pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
+        tile_img_list.append(img)
+
+    def __init__(self, game_mode=GameModes.MENU):
         '''
         Creates a new world object.
         '''
-
-        self.game_state = game_state
-        self._current_level = 1
-        
-        # Background tiles
-        self.bg_images = [
-            pygame.image.load('img/background/sky_cloud.png').convert_alpha(),
-            pygame.image.load('img/background/mountain.png').convert_alpha(),
-            pygame.image.load('img/background/pine1.png').convert_alpha(),
-            pygame.image.load('img/background/pine2.png').convert_alpha()
-        ]
-        self.bg_ypos = [
-            0,
-            SCREEN_HEIGHT - self.bg_images[1].get_height() - 200,
-            SCREEN_HEIGHT - self.bg_images[2].get_height() - 150,
-            SCREEN_HEIGHT - self.bg_images[3].get_height()
-        ]
-        self.bg_width = min([img.get_width() for img in self.bg_images])
-
-        # Foreground tiles
-        self._tile_img_list = []
-        for tile_num in range(TILE_TYPE_COUNT):
-            img = pygame.image.load(f'img/tile/{tile_num}.png').convert_alpha()
-            img = pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
-            self._tile_img_list.append(img)
-
-        # Writing font
-        self._font = pygame.font.SysFont('Futura', 30)
-
+        self.game_mode = game_mode
+        self.current_level = 1
 
     def reset_world(self):
         ''' 
         Resets the sprites and camera for a new level
         '''
-        self._player = None
-        self._health_bar = None
-        self._obstacle_group = pygame.sprite.Group()
-        self._water_group = pygame.sprite.Group()
-        self._decoration_group = pygame.sprite.Group()
-        self._exit_group = pygame.sprite.Group()
-        self._item_group = pygame.sprite.Group()
-        self._enemy_group = pygame.sprite.Group()
-        self._bullet_group = pygame.sprite.Group()
-        self._grenade_group = pygame.sprite.Group()
-        self._explosion_group = pygame.sprite.Group()
-        self.bg_scroll = 0
+        self.player = None
+        self.obstacle_group = pygame.sprite.Group()
+        self.water_group = pygame.sprite.Group()
+        self.decoration_group = pygame.sprite.Group()
+        self.exit_group = pygame.sprite.Group()
+        self.item_group = pygame.sprite.Group()
+        self.enemy_group = pygame.sprite.Group()
+        self.bullet_group = pygame.sprite.Group()
+        self.grenade_group = pygame.sprite.Group()
+        self.explosion_group = pygame.sprite.Group()
+        self.level_complete = False
         self.camera_scroll = 0
-
-
-    @property
-    def player(self):
-        return self._player
-    
-    @property
-    def health_bar(self):
-        return self._health_bar
-
-    @property
-    def item_group(self):
-        return self._item_group
-    
-    @property
-    def enemy_group(self):
-        return self._enemy_group
-    
-    @property
-    def bullet_group(self):
-        return self._bullet_group
-
-    @property
-    def grenade_group(self):
-        return self._grenade_group
-
-    @property
-    def explosion_group(self):
-        return self._explosion_group
-
-    @property
-    def decoration_group(self):
-        return self._decoration_group
-
-    @property
-    def obstacles(self):
-        return self._obstacle_group
-    
-    @property
-    def obstacle_group(self):
-        return self._obstacle_group
-
-    @property
-    def water_group(self):
-        return self._water_group
-
-    @property
-    def exit_group(self):
-        return self._exit_group
+        self.bg_scroll = 0
 
     def load_game_tile(self, tile, idx_x, idx_y):
         '''
         Loads an individual game tile by creating the tile object and adding
         it to the appropriate sprite group.
         '''
-        img = self._tile_img_list[tile]
+        img = GameEngine.tile_img_list[tile]
         rect = img.get_rect()
         rect.x = idx_x * TILE_SIZE
         rect.y = idx_y * TILE_SIZE
 
         if tile <= DIRT_TILE_LAST:
             obstacle_tile = Obstacle(img, rect.x, rect.y)
-            self._obstacle_group.add(obstacle_tile)
+            self.obstacle_group.add(obstacle_tile)
         elif tile <= WATER_TILE_LAST:
             water_tile = Water(img, rect.x, rect.y)
-            self._water_group.add(water_tile)
+            self.water_group.add(water_tile)
         elif tile <= DECORATION_TILE_LAST:
             decoration_tile = Decoration(img, rect.x, rect.y)
-            self._decoration_group.add(decoration_tile)
+            self.decoration_group.add(decoration_tile)
         elif tile == PLAYER_TILE_ID:
-            self._player = Player(rect.x, rect.y, 'player', 1.65)
-            self._health_bar = HealthBar(10, 10, self._player.max_health)
+            self.player = Player(rect.x, rect.y, 'player', 1.65)
+            #self._health_bar = HealthBar(10, 10, self._player.max_health)
         elif tile == ENEMY_TILE_ID:
             enemy = Enemy(rect.x, rect.y, 'enemy', 1.65, 2)
-            self._enemy_group.add(enemy)
+            self.enemy_group.add(enemy)
         elif tile == AMMO_TILE_ID:
-            item = weapons.ItemBox(rect.x, rect.y, 'ammo')
-            self._item_group.add(item)
+            item = ItemBox(rect.x, rect.y, 'ammo')
+            self.item_group.add(item)
         elif tile == GRENADE_TILE_ID:
-            item = weapons.ItemBox(rect.x, rect.y, 'grenade')
-            self._item_group.add(item)
+            item = ItemBox(rect.x, rect.y, 'grenade')
+            self.item_group.add(item)
         elif tile == HEALTH_TILE_ID:
-            item = weapons.ItemBox(rect.x, rect.y, 'health')
-            self._item_group.add(item)
+            item = ItemBox(rect.x, rect.y, 'health')
+            self.item_group.add(item)
         elif tile == LEVEL_EXIT_TILE_ID: # level exit
             exit_tile = Exit(img, rect.x, rect.y)
-            self._exit_group.add(exit_tile)        
+            self.exit_group.add(exit_tile)        
 
 
-    def load_game_level(self, level=None) -> Player:
+    def load_next_level(self):        
+        self.current_level += 1
+        if exists(f'level{self.current_level}_data.csv'):
+            self.load_current_level()
+        else:
+            print(f'Error: level {self.current_level} does not exist')
+            self.game_mode = GameModes.QUIT
+
+    def load_current_level(self) -> Player:
         '''
         Loads the starting world state for the given level.
         '''
-        if level is None:
-            level = self._current_level
-
-        if not exists(f'level{level}_data.csv'):
-            print(f'Error: level {level} does not exist')
-            return False
-
         self.reset_world()
 
         # Read the level data from a CSV file
         world_data = []
-        with open(f'level{level}_data.csv', 'r') as csvfile:
+        with open(f'level{self.current_level}_data.csv', 'r') as csvfile:
             reader = csv.reader(csvfile, delimiter=',')
             for idx_y, row_of_tiles in enumerate(reader):
                 world_data.append([])
@@ -258,7 +214,7 @@ class GameEngine():
         for grenade in self.grenade_group:
             if grenade.fuse_timer <= 0:
                 # Animate with an explosion
-                explosion = weapons.Explosion(grenade.rect.x, grenade.rect.y, 0.75)
+                explosion = Explosion(grenade.rect.x, grenade.rect.y, 0.75)
                 self.explosion_group.add(explosion)
                 grenade.kill()
                 # Calculate damage against player
@@ -274,6 +230,10 @@ class GameEngine():
                 or self.player.rect.top > SCREEN_HEIGHT
                 or spritecollide(self.player, self.water_group, False)):
             self.player.death()
+
+    def check_if_level_exit(self):
+        if spritecollide(self.player, self.exit_group, False):
+            self.level_complete = True
 
     def update(self, controller):
         
@@ -302,14 +262,15 @@ class GameEngine():
         self.handle_bullet_damage()
         self.make_grenades_explode()
         self.check_for_player_death()
+        self.check_if_level_exit()
 
     def update_scrolling(self):
         # If the player is moving too far right or left, scroll the screen
-        if ((self._player.direction == Direction.RIGHT 
-                and self._player.rect.right + self.camera_scroll >= SCROLL_RIGHT
+        if ((self.player.direction == Direction.RIGHT 
+                and self.player.rect.right + self.camera_scroll >= SCROLL_RIGHT
                 and self.bg_scroll + SCREEN_WIDTH < self.world_width)
-            or (self._player.direction == Direction.LEFT 
-                and self._player.rect.left + self.camera_scroll < SCROLL_LEFT
+            or (self.player.direction == Direction.LEFT 
+                and self.player.rect.left + self.camera_scroll < SCROLL_LEFT
                 and self.bg_scroll > 0)):
             self.camera_scroll -= self.player.dx
             self.bg_scroll += self.player.dx
@@ -332,7 +293,7 @@ class GameEngine():
         sprite.dx = sprite.vel_x * sprite.direction.value
 
         # Detect collisions with wall (x) and ground (y) obstacles
-        for tile in self._obstacle_group:
+        for tile in self.obstacle_group:
             predicted_x = pygame.Rect(sprite.rect.x + sprite.dx, sprite.rect.y, 
                                       sprite.rect.width, sprite.rect.height)
             if tile.rect.colliderect(predicted_x):
@@ -366,47 +327,50 @@ class GameEngine():
         '''
         Blits all of the sprites in the entire world onto the screen.
         '''
-        #screen.fill(BG_COLOR)
 
         # Draw the background graphics (sky, mountains, trees, etc)
         for x in range(5):
-            screen.blit(self.bg_images[0], ((x * self.bg_width) - self.bg_scroll * 0.5, self.bg_ypos[0]))
-            screen.blit(self.bg_images[1], ((x * self.bg_width) - self.bg_scroll * 0.6, self.bg_ypos[1]))
-            screen.blit(self.bg_images[2], ((x * self.bg_width) - self.bg_scroll * 0.7, self.bg_ypos[2]))
-            screen.blit(self.bg_images[3], ((x * self.bg_width) - self.bg_scroll * 0.8, self.bg_ypos[3]))
+            img_posx = (x * GameEngine.bg_width) - self.bg_scroll * 0.5
+            screen.blit(GameEngine.bg_img[0], (img_posx, GameEngine.bg_ypos[0]))
+            img_posx = (x * GameEngine.bg_width) - self.bg_scroll * 0.6
+            screen.blit(GameEngine.bg_img[1], (img_posx, GameEngine.bg_ypos[1]))
+            img_posx = (x * GameEngine.bg_width) - self.bg_scroll * 0.7
+            screen.blit(GameEngine.bg_img[2], (img_posx, GameEngine.bg_ypos[2]))
+            img_posx = (x * GameEngine.bg_width) - self.bg_scroll * 0.8
+            screen.blit(GameEngine.bg_img[3], (img_posx, GameEngine.bg_ypos[3]))
 
         # Draw the world
-        for tile in self._obstacle_group:
+        for tile in self.obstacle_group:
             tile.draw(screen, self.camera_scroll)
-        for tile in self._water_group:
+        for tile in self.water_group:
             tile.draw(screen, self.camera_scroll)
-        for tile in self._exit_group:
+        for tile in self.exit_group:
             tile.draw(screen, self.camera_scroll)        
-        for tile in self._decoration_group:
+        for tile in self.decoration_group:
             tile.draw(screen, self.camera_scroll)
-        for tile in self._item_group:
+        for tile in self.item_group:
             tile.draw(screen, self.camera_scroll)
-        for tile in self._bullet_group:
+        for tile in self.bullet_group:
             tile.draw(screen, self.camera_scroll)
-        for tile in self._grenade_group:
+        for tile in self.grenade_group:
             tile.draw(screen, self.camera_scroll)
-        for tile in self._explosion_group:
+        for tile in self.explosion_group:
             tile.draw(screen, self.camera_scroll)
 
         # Draw the soldiers
-        for tile in self._enemy_group:
+        for tile in self.enemy_group:
             tile.draw(screen, self.camera_scroll)
         self.player.draw(screen, self.camera_scroll)
 
         # Draw the status bars
-        self.health_bar.draw(screen, self.player.health)
-        self.draw_text(screen, f'GRENADES: {self.player.grenades}', WHITE, 10, 35)
-        self.draw_text(screen, f'ROUNDS: {self.player.ammo}', WHITE, 10, 60)
+        #self.health_bar.draw(screen, self.player.health)
+        #self.draw_text(screen, f'GRENADES: {self.player.grenades}', WHITE, 10, 35)
+        #self.draw_text(screen, f'ROUNDS: {self.player.ammo}', WHITE, 10, 60)
 
 
-    def draw_text(self, screen, text, color, x, y):
-        img = self._font.render(text, True, color)
-        screen.blit(img, (x, y))
+    #def draw_text(self, screen, text, color, x, y):
+        #img = self._font.render(text, True, color)
+        #screen.blit(img, (x, y))
 
 
 class Obstacle(pygame.sprite.Sprite):

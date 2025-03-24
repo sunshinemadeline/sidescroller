@@ -1,22 +1,47 @@
 import pygame
-from settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS            # type: ignore
-from settings import BG_COLOR, PINK, BLACK                       # type: ignore
+from settings import SCREEN_WIDTH, SCREEN_HEIGHT
+from colors import WHITE, RED, GREEN
 from enum import Enum
 
-_LEFT_BUTTON = 0    # TODO: CLean up
-_MIDDLE_BUTTON = 1
-_RIGHT_BUTTON = 2
+class HealthBar():
+    '''
+    Graphic to visualize the player's health as a green/red rectangle.
+    '''
 
-# Drawing colors
-BG_COLOR = (144, 201, 120)
-BLACK = (32, 32, 32)
-WHITE = (255, 255, 255)
-GREEN = (0, 255, 0)
-PINK = (235, 65, 54)
-RED = (255, 0, 0)
+    def __init__(self, x, y, width=150, height=20):
+        '''
+        Initializes a player's health bar with the full health value.
+        '''
+
+        self.x, self.y = x, y
+        self.width = width
+        self.height = height
+
+    def draw(self, screen, health_pct):
+        '''
+        Draws the player's health bar to the given screen surface.
+        '''
+
+        health_size = self.width * health_pct
+        pygame.draw.rect(screen, WHITE, (self.x-1, self.y-1, self.width+2, self.height+2))
+        pygame.draw.rect(screen, RED, (self.x, self.y, self.width, self.height))
+        pygame.draw.rect(screen, GREEN, (self.x, self.y, health_size, self.height))
+
 
 class GameButton():
+    '''
+    A simple button for a PyGame GUI window.
+    '''
+
+    LEFT_MBUTTON = 0
+    MIDDLE_MBUTTON = 1
+    RIGHT_MBUTTON = 2
+
     def __init__(self, image, x, y, scale=1.0):
+        '''
+        Initializes the button's image and location.
+        '''
+
         width = int(image.get_width() * scale)
         height = int(image.get_height() * scale)
         self.image = pygame.transform.scale(image, (width, height))
@@ -25,14 +50,21 @@ class GameButton():
         self.clicked = False
 
     def draw(self, screen):
+        '''
+        Draws the button to the given screen surface.
+        '''
+
         screen.blit(self.image, (self.rect.x, self.rect.y))
 	
     def is_clicked(self):
-        """Returns True if the button is clicked."""
+        '''
+        Returns True if the button is clicked.
+        '''
+
         mouse_pos = pygame.mouse.get_pos()
         mouse_clicked = pygame.mouse.get_pressed()
         if self.rect.collidepoint(mouse_pos):
-            if mouse_clicked[_LEFT_BUTTON] and not self.clicked:
+            if mouse_clicked[GameButton.LEFT_MBUTTON] and not self.clicked:
                 self.clicked = True
                 return True
         else:
@@ -40,6 +72,10 @@ class GameButton():
         return False
     
     def reset(self):
+        '''
+        Resets the button after it has been clicked.
+        '''
+
         self.clicked = False
 
 
@@ -48,13 +84,16 @@ class FadeType(Enum):
     LEVEL_EVENT = 1
     DEATH_EVENT = 2
 
-
 class GameFade():
+    '''
+    An object for visually transitioning from one part of the game to another.
+    '''
+
     def __init__(self, fade_type, color, speed=5):
         '''
-        direction = 1 is whole screen
-        direction = 2 is vertical
+        Initializes a string fade object according to the allowed types.
         '''
+
         self.fade_type = fade_type
         self.color = color
         self.speed = speed
@@ -63,34 +102,40 @@ class GameFade():
         self.finished = True
 
     def begin_fade(self):
+        '''
+        Begins drawing a fade animation sequence.
+        '''
+                
         self.counter = 0
         self.started = True
         self.finished = False
 
+    def end_fade(self):
+        self.started = False
+
     def draw_fade(self, screen):
-        # Three types of fades
+        '''
+        Draws a frame from a screen fade animation baed on the fade type.
+        '''
+
         if self.fade_type == FadeType.INTRO_EVENT:
-            #if self.counter <= SCREEN_WIDTH:
-            self.counter += self.speed
             pygame.draw.rect(screen, self.color, (0 - self.counter, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT))
             pygame.draw.rect(screen, self.color, (SCREEN_WIDTH // 2 + self.counter, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT))
             pygame.draw.rect(screen, self.color, (0, 0 - self.counter, SCREEN_WIDTH, SCREEN_HEIGHT // 2))
             pygame.draw.rect(screen, self.color, (0, SCREEN_HEIGHT // 2 + self.counter, SCREEN_WIDTH, SCREEN_HEIGHT // 2))
         
         elif self.fade_type == FadeType.LEVEL_EVENT:
-            #if self.counter <= SCREEN_WIDTH:
-            self.counter += self.speed
             pygame.draw.rect(screen, self.color, (0, 0, self.counter, SCREEN_HEIGHT))
-            pygame.draw.rect(screen, self.color, (SCREEN_WIDTH - self.counter, 0, SCREEN_WIDTH // 2 - self.counter, SCREEN_HEIGHT))
-            pygame.draw.rect(screen, self.color, (0, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT))
-            pygame.draw.rect(screen, self.color, (0, SCREEN_HEIGHT - self.counter, SCREEN_WIDTH, self.counter))
+            pygame.draw.rect(screen, self.color, (SCREEN_WIDTH - self.counter, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
+            pygame.draw.rect(screen, self.color, (0, 0, SCREEN_WIDTH, self.counter))
+            pygame.draw.rect(screen, self.color, (0, SCREEN_HEIGHT - self.counter, SCREEN_WIDTH, SCREEN_HEIGHT))
 
         elif self.fade_type == FadeType.DEATH_EVENT:
-            #if self.counter <= SCREEN_HEIGHT:
-            self.counter += self.speed
             pygame.draw.rect(screen, self.color, (0, 0, SCREEN_WIDTH, self.counter))
         
+        # Stop when we reach a certain point.
+        self.counter += self.speed
         if self.counter >= SCREEN_WIDTH:
             self.finished = True
-            self.started = False
+            #self.started = False
 

@@ -9,17 +9,20 @@ pygame.display.set_caption('Shooter')
 
 # Now import the other modules, which may depend on the mixer and display
 from controller import GameController
-from widgets import GameButton, GameFade, FadeType, BG_COLOR, PINK, BLACK
-from engine import GameEngine
+from widgets import GameButton, GameFade, FadeType, HealthBar
+from engine import GameEngine, GameModes
+from colors import BG_COLOR, PINK, BLACK, WHITE
 
 # Create IO devices:
 #  1) controller for input
 #  2) graphic display for output
 #  3) a clock to keep time
+#  4) a font to write text
 controller = GameController()
 engine = GameEngine()
 screen = pygame.display.get_surface()
 clock = pygame.time.Clock()
+font = pygame.font.SysFont('Futura', 30)
 
 
 def handle_keyboard_events(event: pygame.event.Event, 
@@ -74,26 +77,31 @@ def run_main_menu(engine: GameEngine,
 
     # Handle button clicks
     if start_button.is_clicked():
-        engine.game_state = 'interactive'
-        engine.load_game_level()
+        engine.game_mode = GameModes.INTERACTIVE
+        engine.load_current_level()
         intro_fade.begin_fade()
     if exit_button.is_clicked():
-        engine.game_state = 'quit'
+        engine.game_mode = GameModes.QUIT
 
     # Handle the various ways to quit game
     for event in pygame.event.get():
         if (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
                 or event.type == pygame.QUIT):
-            engine.game_state = 'quit'
+            engine.game_mode = GameModes.QUIT
 
     # Nothing particularly important to return
     return None
 
 
 
-def run_interactive_game(engine: GameEngine,                    # TODO: Add docstring
+def run_interactive_game(engine: GameEngine,
                          controller: GameController, 
                          screen: pygame.Surface) -> None:
+    '''
+    Plays an interactive game between a human player and the computer AI. If
+    the player advances to the next level, we will stay in interactive mode.
+    But if the player dies, we will return to the main menu.
+    '''
 
     # Update the position of all physics-controlled sprites
     engine.update(controller)
@@ -107,42 +115,40 @@ def run_interactive_game(engine: GameEngine,                    # TODO: Add docs
     if not engine.player.alive:
         if not death_fade.started:
             death_fade.begin_fade()
-            pygame.time.set_timer(DEATH_EVENT, 3000)
         if not death_fade.finished:
             death_fade.draw_fade(screen)
+        else:
+            death_fade.end_fade()
+            engine.load_current_level()
+            engine.game_mode = GameModes.MENU
 
     # Special case #3: player advances to the next level
-    if pygame.sprite.spritecollideany(engine.player, engine.exit_group):
-        if not level_fade.started:                    # TODO: Move to game engine and create variable
-            level_fade.begin_fade()                   # for next level that is always triggered
-            pygame.time.set_timer(LEVEL_EVENT, 3000)
+    if engine.level_complete:
+        if not level_fade.started:
+            level_fade.begin_fade()
         if not level_fade.finished:
             level_fade.draw_fade(screen)
+        else:
+            level_fade.end_fade()
+            engine.game_mode = GameModes.INTERACTIVE
+            engine.load_next_level()
+            intro_fade.begin_fade()
 
     # Handle the various controller inputs to the game
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            engine.game_state = 'quit'
+            engine.game_mode = GameModes.QUIT
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            engine.game_state = 'quit'
-        elif event.type == DEATH_EVENT:
-            engine.reset_world()
-            engine.load_game_level()
-            engine.game_state = "menu"               # TODO: Enum
-            pygame.time.set_timer(DEATH_EVENT, 0)    # TODO: Can we get rid of timers?
-        elif event.type == LEVEL_EVENT:
-            engine._current_level += 1               # TODO: Add function?
-            engine.reset_world()
-            engine.load_game_level()
-            engine.game_state = "interactive"
-            intro_fade.begin_fade()
-            pygame.time.set_timer(LEVEL_EVENT, 0)
-
+            engine.game_mode = GameModes.QUIT
         controller = handle_keyboard_events(event, controller)
 
     # Nothing particularly important to return
     return None
 
+engine
+def draw_text(screen, text, color, x, y):
+    img = font.render(text, True, color)
+    screen.blit(img, (x, y))
 
 
 if __name__ == '__main__':
@@ -162,17 +168,25 @@ if __name__ == '__main__':
     LEVEL_EVENT = pygame.USEREVENT + 2
     DEATH_EVENT = pygame.USEREVENT + 3
     intro_fade = GameFade(FadeType.INTRO_EVENT, BLACK)
-    level_fade = GameFade(FadeType.LEVEL_EVENT, BLACK)   # TODO: Fix level fade
+    level_fade = GameFade(FadeType.LEVEL_EVENT, BLACK)
     death_fade = GameFade(FadeType.DEATH_EVENT, PINK)
+
+    # Define the status bars
+    health_bar = HealthBar(10, 10)  # TODO: move health_bar back to world
 
     # The main game loop has several states, each handled separately:
     #   1. 'Menu' where the player can choose between options
     #   2. 'Interactive' where a human player plays the game
-    while engine.game_state != 'quit':
-        if engine.game_state == 'menu':
+    while engine.game_mode != GameModes.QUIT:
+        if engine.game_mode == GameModes.MENU:
             run_main_menu(engine, controller, screen)
-        elif engine.game_state == 'interactive':
+        elif engine.game_mode == GameModes.INTERACTIVE:
             run_interactive_game(engine, controller, screen)
+            health_pct = engine.player.health / engine.player.max_health
+            health_bar.draw(screen, health_pct)
+            draw_text(screen, f'GRNADE: {engine.player.grenades}', WHITE, 10, 35)
+            draw_text(screen, f'ROUNDS: {engine.player.ammo}', WHITE, 10, 60)       
+        
         clock.tick(FPS)
         pygame.display.flip()
     pygame.quit()

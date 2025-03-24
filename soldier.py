@@ -2,50 +2,21 @@ import os
 import random
 import pygame
 from weapons import Bullet, Grenade
-from settings import Direction, Action, TILE_SIZE
+from settings import Direction, Action
 
 
-# TODO: Cleanup and move image loading to class initializers
+# TODO: Cleanup
 
 # All soldiers share these common animation types
 animation_types = ['Idle', 'Run', 'Jump', 'Death']
 
-class HealthBar():
-    '''
-    Graphic to visualize the player's health as a green/red rectangle.
-    '''
 
-    def __init__(self, x, y, max_health, width=150, height=20):
-        self.x, self.y = x, y
-        self.width = width
-        self.height = height
-        self.cur_health = max_health
-        self.max_health = max_health
+class Soldier(pygame.sprite.Sprite):
 
-    def draw(self, screen, health_value):
-        self.cur_health = health_value
-        health_size = self.width * self.cur_health / self.max_health
-        pygame.draw.rect(screen, WHITE, (self.x-1, self.y-1, self.width+2, self.height+2))
-        pygame.draw.rect(screen, RED, (self.x, self.y, self.width, self.height))
-        pygame.draw.rect(screen, GREEN, (self.x, self.y, health_size, self.height))
+    fx_jump = pygame.mixer.Sound('audio/jump.wav')
+    fx_jump.set_volume(0.5)
 
-
-def init():
-    ''' Initializes the soldier module by preloading all images from disk. '''
-
-    # Images for player animation
-    Player.animation_images = []
-    for action in animation_types:
-        image_list = []
-        frame_count = len(os.listdir(f'img/player/{action}'))
-        for i in range(frame_count):
-            img = pygame.image.load(f'img/player/{action}/{i}.png')
-            img = img.convert_alpha()
-            image_list.append(img)
-        Player.animation_images.append(image_list)
-
-    # Images for enemy animation
-    Enemy.animation_images = []
+    animation_images = {}
     for action in animation_types:
         image_list = []
         frame_count = len(os.listdir(f'img/enemy/{action}'))
@@ -53,13 +24,8 @@ def init():
             img = pygame.image.load(f'img/enemy/{action}/{i}.png')
             img = img.convert_alpha()
             image_list.append(img)
-        Enemy.animation_images.append(image_list)
+        animation_images[action] = image_list
 
-
-fx_jump = pygame.mixer.Sound('audio/jump.wav')
-fx_jump.set_volume(0.5)
-
-class Soldier(pygame.sprite.Sprite):
     def __init__(self, x, y, type='player', scale=2, speed=5, health=100, ammo=20, grenades=5):
         super().__init__()
         self.alive = True
@@ -88,12 +54,11 @@ class Soldier(pygame.sprite.Sprite):
         self.action = Action.IDLE
         self.frame_idx = 0
         self.animation_list = []
-        for action in ['Idle', 'Run', 'Jump', 'Death']:
+        for action in animation_types:
             frame_list = []
-            frame_count = len(os.listdir(f'img/{self.type}/{action}'))
+            frame_count = len(Soldier.animation_images[action])
             for i in range(frame_count):
-                img = pygame.image.load(f'img/{self.type}/{action}/{i}.png')
-                img = img.convert_alpha()
+                img = Soldier.animation_images[action][i]
                 new_width = int(img.get_width() * scale)
                 new_height = int(img.get_height() * scale)
                 img = pygame.transform.scale(img, (new_width, new_height))
@@ -141,7 +106,7 @@ class Soldier(pygame.sprite.Sprite):
 
         # Handle vertical movement
         if jump == True and self.in_air == False:
-            fx_jump.play()
+            Soldier.fx_jump.play()
             self.vel_y = -12
             self.in_air = True
 
@@ -196,7 +161,17 @@ class Soldier(pygame.sprite.Sprite):
     
 
 class Enemy(Soldier):
-    animation_images = None
+    # Images for enemy animation
+    animation_images = {}
+    for action in animation_types:
+        image_list = []
+        frame_count = len(os.listdir(f'img/enemy/{action}'))
+        for i in range(frame_count):
+            img = pygame.image.load(f'img/enemy/{action}/{i}.png')
+            img = img.convert_alpha()
+            image_list.append(img)
+        animation_images[action] = image_list
+
 
     def __init__(self, x, y, type='player', scale=2, speed=5, health=100, ammo=20, grenades=5):
         super().__init__(x, y, type, scale, speed, health, ammo, grenades)
@@ -208,13 +183,13 @@ class Enemy(Soldier):
         self.idling_counter = 0
 
         # Animation related variables
+        # TODO: is there a way to make use of class instance? Only thing is scale        
         self.animation_list = []
         for action in animation_types:
             frame_list = []
-            frame_count = len(os.listdir(f'img/{self.type}/{action}'))
+            frame_count = len(Enemy.animation_images[action])
             for i in range(frame_count):
-                img = pygame.image.load(f'img/{self.type}/{action}/{i}.png')
-                img = img.convert_alpha()
+                img = Enemy.animation_images[action][i]
                 new_width = int(img.get_width() * scale)
                 new_height = int(img.get_height() * scale)
                 img = pygame.transform.scale(img, (new_width, new_height))
@@ -235,7 +210,7 @@ class Enemy(Soldier):
         self.idling_counter = random.randint(20, 40)
         return self.shoot()
 
-    def ai_move(self):
+    def ai_move(self, movement_counter=50):
         if self.idling == False and random.randint(1, 1000) < 5:
             self.update(Action.IDLE)
             self.idling = True
@@ -273,7 +248,7 @@ class Enemy(Soldier):
             self.vision.center = (self.rect.centerx + dx, self.rect.centery)
             #pygame.draw.rect(screen, RED, self.vision)
 
-            if self.move_counter > TILE_SIZE:
+            if self.move_counter > movement_counter:
                 self.direction *= -1
                 self.move_counter *= -1
         
@@ -281,19 +256,29 @@ class Enemy(Soldier):
 
 
 class Player(Soldier):
-    animation_images = None
-    
+
+    # Images for player animation
+    animation_images = {}
+    for action in animation_types:
+        image_list = []
+        frame_count = len(os.listdir(f'img/player/{action}'))
+        for i in range(frame_count):
+            img = pygame.image.load(f'img/player/{action}/{i}.png')
+            img = img.convert_alpha()
+            image_list.append(img)
+        animation_images[action] = image_list
+
     def __init__(self, x, y, type='player', scale=2, speed=5, health=100, ammo=20, grenades=5):
         super().__init__(x, y, type, scale, speed, health, ammo, grenades)
 
         # Animation related variables
+        # TODO: is there a way to make use of class instance? Only thing is scale
         self.animation_list = []
         for action in animation_types:
             frame_list = []
-            frame_count = len(os.listdir(f'img/{self.type}/{action}'))
+            frame_count = len(Player.animation_images[action])
             for i in range(frame_count):
-                img = pygame.image.load(f'img/{self.type}/{action}/{i}.png')
-                img = img.convert_alpha()
+                img = Player.animation_images[action][i]
                 new_width = int(img.get_width() * scale)
                 new_height = int(img.get_height() * scale)
                 img = pygame.transform.scale(img, (new_width, new_height))
