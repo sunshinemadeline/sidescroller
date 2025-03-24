@@ -60,7 +60,6 @@ def handle_keyboard_events(event: pygame.event.Event,
     return controller
 
 
-
 def run_main_menu(engine: GameEngine, 
                   controller: GameController, 
                   screen: pygame.Surface) -> None:
@@ -90,7 +89,6 @@ def run_main_menu(engine: GameEngine,
 
     # Nothing particularly important to return
     return None
-
 
 
 def run_interactive_game(engine: GameEngine,

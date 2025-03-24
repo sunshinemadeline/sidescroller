@@ -259,7 +259,7 @@ class GameEngine():
 
     def check_if_level_exit(self):
         if spritecollide(self.player, self.exit_group, False):
-            self.level_codrawmplete = True
+            self.level_complete = True
 
     def update(self, controller):
         
