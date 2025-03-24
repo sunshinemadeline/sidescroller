@@ -311,11 +311,11 @@ class GameEngine():
         '''
         # Calculate vertical movement
         sprite.vel_y += GRAVITY
-        sprite.vel_y = min(10, sprite.vel_y)
-        sprite.dy = sprite.vel_y
+        sprite.vel_y = min(20, sprite.vel_y)
+        sprite.dy = int(sprite.vel_y)
 
         # Calculate lateral movement
-        sprite.dx = sprite.vel_x * sprite.direction.value
+        sprite.dx = int(sprite.vel_x * sprite.direction.value)
 
         # Detect collisions with wall (x) and ground (y) obstacles
         for tile in self.obstacle_group:

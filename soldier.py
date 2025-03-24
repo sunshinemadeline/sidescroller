@@ -107,7 +107,7 @@ class Soldier(pygame.sprite.Sprite):
         # Handle vertical movement
         if jump == True and self.in_air == False:
             Soldier.fx_jump.play()
-            self.vel_y = -12
+            self.vel_y = -13
             self.in_air = True
 
         # Handle lateral movement
