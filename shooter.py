@@ -9,9 +9,9 @@ pygame.display.set_caption('Shooter')
 
 # Now import the other modules, which may depend on the mixer and display
 from controller import GameController
-from widgets import GameButton, GameFade, FadeType, HealthBar
+from widgets import GameButton, GameFade, FadeType
 from engine import GameEngine, GameModes
-from colors import BG_COLOR, PINK, BLACK, WHITE
+from colors import BG_COLOR, PINK, BLACK
 
 # Create IO devices:
 #  1) controller for input
@@ -22,7 +22,6 @@ controller = GameController()
 engine = GameEngine()
 screen = pygame.display.get_surface()
 clock = pygame.time.Clock()
-font = pygame.font.SysFont('Futura', 30)
 
 
 def handle_keyboard_events(event: pygame.event.Event, 
@@ -145,13 +144,11 @@ def run_interactive_game(engine: GameEngine,
     # Nothing particularly important to return
     return None
 
-engine
-def draw_text(screen, text, color, x, y):
-    img = font.render(text, True, color)
-    screen.blit(img, (x, y))
-
 
 if __name__ == '__main__':
+    '''
+    Entry point to the program, runs the main game loop.
+    '''
 
     # Create the buttons for use on the main menudisplay
     start_button_img = pygame.image.load('img/start_btn.png').convert_alpha()
@@ -171,9 +168,6 @@ if __name__ == '__main__':
     level_fade = GameFade(FadeType.LEVEL_EVENT, BLACK)
     death_fade = GameFade(FadeType.DEATH_EVENT, PINK)
 
-    # Define the status bars
-    health_bar = HealthBar(10, 10)  # TODO: move health_bar back to world
-
     # The main game loop has several states, each handled separately:
     #   1. 'Menu' where the player can choose between options
     #   2. 'Interactive' where a human player plays the game
@@ -183,9 +177,9 @@ if __name__ == '__main__':
         elif engine.game_mode == GameModes.INTERACTIVE:
             run_interactive_game(engine, controller, screen)
             health_pct = engine.player.health / engine.player.max_health
-            health_bar.draw(screen, health_pct)
-            draw_text(screen, f'GRNADE: {engine.player.grenades}', WHITE, 10, 35)
-            draw_text(screen, f'ROUNDS: {engine.player.ammo}', WHITE, 10, 60)       
+            #health_bar.draw(screen, health_pct)
+            #draw_text(screen, f'GRNADE: {engine.player.grenades}', WHITE, 10, 35)
+            #draw_text(screen, f'ROUNDS: {engine.player.ammo}', WHITE, 10, 60)       
         
         clock.tick(FPS)
         pygame.display.flip()

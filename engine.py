@@ -6,6 +6,7 @@ from os.path import exists
 from enum import Enum
 from soldier import Player, Enemy, Action
 from weapons import ItemBox, Explosion
+from colors import WHITE, RED, GREEN
 from settings import (SCREEN_HEIGHT, SCREEN_WIDTH, SCROLL_RIGHT, SCROLL_LEFT,
                       TILE_SIZE, TILE_TYPE_COUNT,
                       DIRT_TILE_LAST, WATER_TILE_LAST, DECORATION_TILE_LAST,
@@ -13,7 +14,30 @@ from settings import (SCREEN_HEIGHT, SCREEN_WIDTH, SCROLL_RIGHT, SCROLL_LEFT,
                       GRENADE_TILE_ID, HEALTH_TILE_ID, LEVEL_EXIT_TILE_ID,
                       GRAVITY, Direction)
 
-# Todo: cleanup
+# TODO: cleanup
+
+class HealthBar():
+    '''
+    Graphic to visualize the player's health as a green/red rectangle.
+    '''
+
+    def __init__(self, x, y, max_health, width=150, height=20):
+        '''
+        Initializes a player's health bar with the full health value.
+        '''
+        self.x, self.y = x, y
+        self.width = width
+        self.height = height
+        self.max_health = max_health
+
+    def draw(self, screen, health):
+        '''
+        Draws the player's health bar to the given screen surface.
+        '''
+        health_size = self.width * health / self.max_health
+        pygame.draw.rect(screen, WHITE, (self.x-1, self.y-1, self.width+2, self.height+2))
+        pygame.draw.rect(screen, RED, (self.x, self.y, self.width, self.height))
+        pygame.draw.rect(screen, GREEN, (self.x, self.y, health_size, self.height))
 
 
 class GameModes(Enum):
@@ -56,12 +80,14 @@ class GameEngine():
         '''
         self.game_mode = game_mode
         self.current_level = 1
+        self.font = pygame.font.SysFont('Futura', 30)
 
     def reset_world(self):
         ''' 
         Resets the sprites and camera for a new level
         '''
         self.player = None
+        self.health_bar = None
         self.obstacle_group = pygame.sprite.Group()
         self.water_group = pygame.sprite.Group()
         self.decoration_group = pygame.sprite.Group()
@@ -96,7 +122,7 @@ class GameEngine():
             self.decoration_group.add(decoration_tile)
         elif tile == PLAYER_TILE_ID:
             self.player = Player(rect.x, rect.y, 'player', 1.65)
-            #self._health_bar = HealthBar(10, 10, self._player.max_health)
+            self.health_bar = HealthBar(10, 10, self.player.max_health)
         elif tile == ENEMY_TILE_ID:
             enemy = Enemy(rect.x, rect.y, 'enemy', 1.65, 2)
             self.enemy_group.add(enemy)
@@ -233,7 +259,7 @@ class GameEngine():
 
     def check_if_level_exit(self):
         if spritecollide(self.player, self.exit_group, False):
-            self.level_complete = True
+            self.level_codrawmplete = True
 
     def update(self, controller):
         
@@ -283,7 +309,6 @@ class GameEngine():
         Calculates and moves a sprite's position based on its current velocity
         and the effect of gravity.
         '''
-
         # Calculate vertical movement
         sprite.vel_y += GRAVITY
         sprite.vel_y = min(10, sprite.vel_y)
@@ -327,7 +352,6 @@ class GameEngine():
         '''
         Blits all of the sprites in the entire world onto the screen.
         '''
-
         # Draw the background graphics (sky, mountains, trees, etc)
         for x in range(5):
             img_posx = (x * GameEngine.bg_width) - self.bg_scroll * 0.5
@@ -363,14 +387,14 @@ class GameEngine():
         self.player.draw(screen, self.camera_scroll)
 
         # Draw the status bars
-        #self.health_bar.draw(screen, self.player.health)
-        #self.draw_text(screen, f'GRENADES: {self.player.grenades}', WHITE, 10, 35)
-        #self.draw_text(screen, f'ROUNDS: {self.player.ammo}', WHITE, 10, 60)
+        self.health_bar.draw(screen, self.player.health)
+        self.draw_text(screen, f'GRENADES: {self.player.grenades}', WHITE, 10, 35)
+        self.draw_text(screen, f'ROUNDS: {self.player.ammo}', WHITE, 10, 60)
 
 
-    #def draw_text(self, screen, text, color, x, y):
-        #img = self._font.render(text, True, color)
-        #screen.blit(img, (x, y))
+    def draw_text(self, screen, text, color, x, y):
+        img = self.font.render(text, True, color)
+        screen.blit(img, (x, y))
 
 
 class Obstacle(pygame.sprite.Sprite):

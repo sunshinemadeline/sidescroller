@@ -3,36 +3,11 @@ from settings import SCREEN_WIDTH, SCREEN_HEIGHT
 from colors import WHITE, RED, GREEN
 from enum import Enum
 
-class HealthBar():
-    '''
-    Graphic to visualize the player's health as a green/red rectangle.
-    '''
-
-    def __init__(self, x, y, width=150, height=20):
-        '''
-        Initializes a player's health bar with the full health value.
-        '''
-
-        self.x, self.y = x, y
-        self.width = width
-        self.height = height
-
-    def draw(self, screen, health_pct):
-        '''
-        Draws the player's health bar to the given screen surface.
-        '''
-
-        health_size = self.width * health_pct
-        pygame.draw.rect(screen, WHITE, (self.x-1, self.y-1, self.width+2, self.height+2))
-        pygame.draw.rect(screen, RED, (self.x, self.y, self.width, self.height))
-        pygame.draw.rect(screen, GREEN, (self.x, self.y, health_size, self.height))
-
 
 class GameButton():
     '''
     A simple button for a PyGame GUI window.
     '''
-
     LEFT_MBUTTON = 0
     MIDDLE_MBUTTON = 1
     RIGHT_MBUTTON = 2
@@ -41,7 +16,6 @@ class GameButton():
         '''
         Initializes the button's image and location.
         '''
-
         width = int(image.get_width() * scale)
         height = int(image.get_height() * scale)
         self.image = pygame.transform.scale(image, (width, height))
@@ -53,14 +27,12 @@ class GameButton():
         '''
         Draws the button to the given screen surface.
         '''
-
         screen.blit(self.image, (self.rect.x, self.rect.y))
 	
     def is_clicked(self):
         '''
         Returns True if the button is clicked.
         '''
-
         mouse_pos = pygame.mouse.get_pos()
         mouse_clicked = pygame.mouse.get_pressed()
         if self.rect.collidepoint(mouse_pos):
@@ -75,7 +47,6 @@ class GameButton():
         '''
         Resets the button after it has been clicked.
         '''
-
         self.clicked = False
 
 
@@ -93,7 +64,6 @@ class GameFade():
         '''
         Initializes a string fade object according to the allowed types.
         '''
-
         self.fade_type = fade_type
         self.color = color
         self.speed = speed
@@ -104,8 +74,7 @@ class GameFade():
     def begin_fade(self):
         '''
         Begins drawing a fade animation sequence.
-        '''
-                
+        '''     
         self.counter = 0
         self.started = True
         self.finished = False
@@ -117,7 +86,6 @@ class GameFade():
         '''
         Draws a frame from a screen fade animation baed on the fade type.
         '''
-
         if self.fade_type == FadeType.INTRO_EVENT:
             pygame.draw.rect(screen, self.color, (0 - self.counter, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT))
             pygame.draw.rect(screen, self.color, (SCREEN_WIDTH // 2 + self.counter, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT))

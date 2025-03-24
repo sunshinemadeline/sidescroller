@@ -31,7 +31,6 @@ class ItemBox(pygame.sprite.Sprite):
 
 class Bullet(pygame.sprite.Sprite):
     ''' Ammunition for the soldiers to shoot. '''
-
     image = pygame.image.load('img/icons/bullet.png').convert_alpha()
     sound_fx = pygame.mixer.Sound('audio/shot.wav')
     sound_fx.set_volume(0.4)
