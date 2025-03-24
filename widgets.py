@@ -43,12 +43,10 @@ class GameButton():
         self.clicked = False
 
 
-
 class FadeType(Enum):
     INTRO_EVENT = 0
     LEVEL_EVENT = 1
     DEATH_EVENT = 2
-
 
 
 class GameFade():
@@ -61,15 +59,17 @@ class GameFade():
         self.color = color
         self.speed = speed
         self.counter = 0
+        self.started = False
         self.finished = True
 
     def begin_fade(self):
         self.counter = 0
+        self.started = True
         self.finished = False
 
     def draw_fade(self, screen):
         # Three types of fades
-        if self.fade_type == FadeType.STARTLEVEL:
+        if self.fade_type == FadeType.INTRO_EVENT:
             #if self.counter <= SCREEN_WIDTH:
             self.counter += self.speed
             pygame.draw.rect(screen, self.color, (0 - self.counter, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT))
@@ -77,7 +77,7 @@ class GameFade():
             pygame.draw.rect(screen, self.color, (0, 0 - self.counter, SCREEN_WIDTH, SCREEN_HEIGHT // 2))
             pygame.draw.rect(screen, self.color, (0, SCREEN_HEIGHT // 2 + self.counter, SCREEN_WIDTH, SCREEN_HEIGHT // 2))
         
-        elif self.fade_type == FadeType.ENDLEVEL:
+        elif self.fade_type == FadeType.LEVEL_EVENT:
             #if self.counter <= SCREEN_WIDTH:
             self.counter += self.speed
             pygame.draw.rect(screen, self.color, (0, 0, self.counter, SCREEN_HEIGHT))
@@ -85,11 +85,12 @@ class GameFade():
             pygame.draw.rect(screen, self.color, (0, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT))
             pygame.draw.rect(screen, self.color, (0, SCREEN_HEIGHT - self.counter, SCREEN_WIDTH, self.counter))
 
-        elif self.fade_type == FadeType.PLAYERDEATH:
+        elif self.fade_type == FadeType.DEATH_EVENT:
             #if self.counter <= SCREEN_HEIGHT:
             self.counter += self.speed
             pygame.draw.rect(screen, self.color, (0, 0, SCREEN_WIDTH, self.counter))
         
         if self.counter >= SCREEN_WIDTH:
             self.finished = True
+            self.started = False
 

@@ -107,8 +107,7 @@ def run_interactive_game(engine: GameEngine,
 
     # Special case #2: player dies, restart same level
     if not engine.player.alive:
-        if not death_timer:
-            death_timer = True
+        if not death_fade.started:
             death_fade.begin_fade()
             pygame.time.set_timer(DEATH_EVENT, 3000)
         if not death_fade.finished:
@@ -116,8 +115,7 @@ def run_interactive_game(engine: GameEngine,
 
     # Special case #3: player advances to the next level
     if pygame.sprite.spritecollideany(engine.player, engine.exit_group):
-        if not level_timer:
-            level_timer = True
+        if not level_fade.started:
             level_fade.begin_fade()
             pygame.time.set_timer(LEVEL_EVENT, 3000)
         if not level_fade.finished:
@@ -153,19 +151,15 @@ def run_interactive_game(engine: GameEngine,
 
 if __name__ == '__main__':
 
-    # Global variables for the game
-    death_timer = False
-    level_timer = False
-
     # Create the buttons for use on the main menudisplay
     start_button_img = pygame.image.load('img/start_btn.png').convert_alpha()
-    start_button_x = SCREEN_WIDTH // 2 - start_button_img.rect.width
-    start_button_y = SCREEN_HEIGHT // 2 - start_button_img.rect.height - 100
+    start_button_x = SCREEN_WIDTH // 2 - start_button_img.get_width() // 2
+    start_button_y = SCREEN_HEIGHT // 2 - start_button_img.get_height() - 100
     start_button = GameButton(start_button_img, start_button_x, start_button_y)
     exit_button_img = pygame.image.load('img/exit_btn.png').convert_alpha()
-    exit_button_x = SCREEN_WIDTH // 2 - exit_button_img.rect.width
-    exit_button_y = SCREEN_HEIGHT // 2 - exit_button_img.rect.height - 100
-    exit_button = GameButton('img/exit_btn.png', exit_button_x, exit_button_y)
+    exit_button_x = SCREEN_WIDTH // 2 - exit_button_img.get_width() // 2
+    exit_button_y = SCREEN_HEIGHT // 2 - exit_button_img.get_height() + 100
+    exit_button = GameButton(exit_button_img, exit_button_x, exit_button_y)
 
     # Define notable game events and their transitions
     INTRO_EVENT = pygame.USEREVENT + 1
