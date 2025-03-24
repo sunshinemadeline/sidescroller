@@ -1,10 +1,11 @@
 import os
 import random
 import pygame
-from weapons import Bullet, Grenade                               # type: ignore
-from settings import Direction, Action
-from settings import TILE_SIZE, WHITE, RED, GREEN
+from weapons import Bullet, Grenade
+from settings import Direction, Action, TILE_SIZE
 
+
+# TODO: Cleanup and move image loading to class initializers
 
 # All soldiers share these common animation types
 animation_types = ['Idle', 'Run', 'Jump', 'Death']

@@ -91,11 +91,9 @@ def run_main_menu(engine: GameEngine,
 
 
 
-def run_interactive_game(engine: GameEngine, 
+def run_interactive_game(engine: GameEngine,                    # TODO: Add docstring
                          controller: GameController, 
                          screen: pygame.Surface) -> None:
-
-    global level_timer, death_timer
 
     # Update the position of all physics-controlled sprites
     engine.update(controller)
@@ -115,8 +113,8 @@ def run_interactive_game(engine: GameEngine,
 
     # Special case #3: player advances to the next level
     if pygame.sprite.spritecollideany(engine.player, engine.exit_group):
-        if not level_fade.started:
-            level_fade.begin_fade()
+        if not level_fade.started:                    # TODO: Move to game engine and create variable
+            level_fade.begin_fade()                   # for next level that is always triggered
             pygame.time.set_timer(LEVEL_EVENT, 3000)
         if not level_fade.finished:
             level_fade.draw_fade(screen)
@@ -130,14 +128,12 @@ def run_interactive_game(engine: GameEngine,
         elif event.type == DEATH_EVENT:
             engine.reset_world()
             engine.load_game_level()
-            death_timer = False            
-            engine.game_state = "menu"
-            pygame.time.set_timer(DEATH_EVENT, 0)
+            engine.game_state = "menu"               # TODO: Enum
+            pygame.time.set_timer(DEATH_EVENT, 0)    # TODO: Can we get rid of timers?
         elif event.type == LEVEL_EVENT:
-            engine._current_level += 1
+            engine._current_level += 1               # TODO: Add function?
             engine.reset_world()
             engine.load_game_level()
-            level_timer = False
             engine.game_state = "interactive"
             intro_fade.begin_fade()
             pygame.time.set_timer(LEVEL_EVENT, 0)
@@ -166,7 +162,7 @@ if __name__ == '__main__':
     LEVEL_EVENT = pygame.USEREVENT + 2
     DEATH_EVENT = pygame.USEREVENT + 3
     intro_fade = GameFade(FadeType.INTRO_EVENT, BLACK)
-    level_fade = GameFade(FadeType.LEVEL_EVENT, BLACK)
+    level_fade = GameFade(FadeType.LEVEL_EVENT, BLACK)   # TODO: Fix level fade
     death_fade = GameFade(FadeType.DEATH_EVENT, PINK)
 
     # The main game loop has several states, each handled separately:

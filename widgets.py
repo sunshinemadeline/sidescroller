@@ -3,7 +3,7 @@ from settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS            # type: ignore
 from settings import BG_COLOR, PINK, BLACK                       # type: ignore
 from enum import Enum
 
-_LEFT_BUTTON = 0
+_LEFT_BUTTON = 0    # TODO: CLean up
 _MIDDLE_BUTTON = 1
 _RIGHT_BUTTON = 2
 
