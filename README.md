@@ -2,7 +2,7 @@
 Welcome to my fun little side-scrolling shooter game! You play as a Rambo-style hero, armed with a gun and grenades, facing off against enemy soldiers who are relentless in their pursuit. Enemies patrol their platforms and if they see you, they’ll shoot! Scattered across each level, you’ll find health packs and useful power-ups. These are essential for survival because the game is reasonably difficult. Stay alert, keep moving, and don’t run out of ammo!
 
 ## Acknowledgements ##
-This was my first game of any significance. I owe a lot of credit to **[Coding With Russ](https://github.com/russs123/Shooter)** and his fantastic tutorials. I watched several of his videos and borrowed (err, ...copied) his graphics and sounds verbatim. That said, I designed the code from scratch and used a completely different architecture.
+This was my first game of any significance. I owe a lot of credit to **[Coding With Russ](https://github.com/russs123/Shooter)** and his fantastic tutorials. I watched several of his [YouTube videos](https://www.youtube.com/watch?v=DHgj5jhMJKg&list=PLjcN1EyupaQm20hlUE11y9y8EY2aXLpnv) and borrowed (err, ...copied) his graphics and sounds verbatim. That said, I designed the code from scratch and used a completely different architecture.
 
 ## Structure ##
 Although there are a handful of small files, the majority of my game is contained in these three files:
