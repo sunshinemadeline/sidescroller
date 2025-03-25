@@ -1,11 +1,19 @@
 
 import pygame
-from pygame.image import load as load
+from pygame.time import get_ticks
+from pygame.image import load
+from settings import (ANIMATION_DELAY,
+                      GRENADE_FUSE_TIME, GRENADE_FULL_DAMAGE, 
+                      GRENADE_INNER_RADIUS, GRENADE_OUTER_RADIUS,
+                      GRENADE_VELOCITY_X, GRENADE_VELOCITY_Y,
+                      BULLET_FULL_DAMAGE, BULLET_VELOCITY_X)
 from os import listdir
 
 
 class ItemBox(pygame.sprite.Sprite):
-    ''' Supplies for the player to collect with ammo, grenades, or health. '''
+    '''
+    Supplies for the player to collect with ammo, grenades, or health.
+    '''
 
     images = {
         'ammo': load(f'img/icons/ammo_box.png').convert_alpha(),
@@ -14,31 +22,40 @@ class ItemBox(pygame.sprite.Sprite):
     }
 
     def __init__(self, x, y, box_type='ammo', quantity=20):
+        '''
+        Initializes an ItemBox based on the box type
+        '''
         super().__init__()
         self.box_type = box_type
         self.quantity = quantity
         self.image = ItemBox.images[box_type]
         self.rect = self.image.get_rect()
         self.rect.midtop = (x, y - self.image.get_height())
-        
-    def update(self):
-        pass
 
-    def draw(self, screen, screen_scroll):
-        screen.blit(self.image, (self.rect.x + screen_scroll, self.rect.y))
-
+    def draw(self, screen, camera_x):
+        '''
+        Draws this Item box after setting the camera position.
+        '''        
+        screen.blit(self.image, (self.rect.x + camera_x, self.rect.y))
 
 
 class Bullet(pygame.sprite.Sprite):
-    ''' Ammunition for the soldiers to shoot. '''
+    '''
+    Bullets for the Soldier to shoot.
+    '''
+
+    # Load media from disk into shared memory for each instance to copy
     image = pygame.image.load('img/icons/bullet.png').convert_alpha()
     sound_fx = pygame.mixer.Sound('audio/shot.wav')
     sound_fx.set_volume(0.4)
 
-    def __init__(self, x, y, direction, damage=25, speed=15):
+    def __init__(self, x, y, direction):
+        '''
+        Initialize Bullet object; a weapon Soldiers shoot.
+        '''                
         super().__init__()
-        self.speed = speed
-        self.damage = damage
+        self.vel_x = BULLET_VELOCITY_X
+        self.damage = BULLET_FULL_DAMAGE
         self.direction = direction
         self.image = Bullet.image
         self.rect = self.image.get_rect()
@@ -46,95 +63,134 @@ class Bullet(pygame.sprite.Sprite):
         Bullet.sound_fx.play()
 
     def update(self):
-        self.rect.x += self.speed * self.direction.value
+        '''
+        Updates the position of the bullet. Most other objects are controlled
+        by the physics engine. But since bullets are not affected by gravity
+        (we treat them more like lasers), we need a special handler here.
+        '''
+        self.rect.x += self.vel_x * self.direction.value
 
-    def draw(self, screen, screen_scroll):
-        screen.blit(self.image, (self.rect.x + screen_scroll, self.rect.y))
+    def draw(self, screen, camera_x):
+        '''
+        Draws this Item box after setting the camera position.
+        '''                
+        screen.blit(self.image, (self.rect.x + camera_x, self.rect.y))
 
 
 
 class Grenade(pygame.sprite.Sprite):
+    '''
+    A weapon for Soldier objects to throw that cause splash damage.
+    '''
 
+    # Load media from disk into shared memory for each instance to copy
     image = pygame.image.load('img/icons/grenade.png').convert_alpha()
 
-    def __init__(self, x, y, direction, inner_radius=50, outer_radius=200, full_damage=100, vel_x=7, vel_y=-11):
+    def __init__(self, x, y, direction):
+        '''
+        Initialize Grenade object; a weapon thrown by soldiers.
+        '''        
         super().__init__()
-        self.fuse_timer = 100
-        self.vel_x = vel_x
-        self.vel_y = vel_y
         self.in_air = True
-        self.inner_radius = inner_radius
-        self.outer_radius = outer_radius
-        self.full_damage = full_damage
+        self.vel_x = GRENADE_VELOCITY_X
+        self.vel_y = GRENADE_VELOCITY_Y
+        self.inner_radius = GRENADE_INNER_RADIUS
+        self.outer_radius = GRENADE_OUTER_RADIUS
+        self.full_damage = GRENADE_FULL_DAMAGE
         self.image = Grenade.image
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
         self.direction = direction
+        self.throw_time = get_ticks()
+        self.do_explosion = False
 
     def damage_at(self, pos_rect):
+        '''
+        Determine the amount of splash damage at a particular point. We use
+        Manhattan Distance instead of Euclidean Distance because there is no
+        square root calculation (which is slow).
+        '''
+        damage = 0
         manhattan_dist = (abs(self.rect.centerx - pos_rect.centerx) +
                           abs(self.rect.centery - pos_rect.centery))
-        if manhattan_dist > self.outer_radius:
-            return 0
-        elif manhattan_dist < self.inner_radius:
-            return self.full_damage
+        if manhattan_dist < self.inner_radius:
+            damage = self.full_damage
         else:
             # y = A * (1 - x / B)
             A = self.full_damage
             B = self.outer_radius - self.inner_radius
-            return int(A * (1 - (manhattan_dist - self.inner_radius) / B))
+            damage = int(A * (1 - (manhattan_dist - self.inner_radius) / B))
+        return damage
     
     def landed(self, impact_velocity):
+        '''
+        The physics engine calls this function when a Grenade hits the ground.
+        It stops the object from moving further at its original velocity.
+        '''
         self.vel_y = 0
         self.vel_x = 0
         self.in_air = False
 
     def update(self):
-        self.fuse_timer -= 1
+        '''
+        Determines when the grade should explode.
+        '''
+        if get_ticks() > self.throw_time + GRENADE_FUSE_TIME:
+            self.do_explosion = True
 
-    def draw(self, screen, screen_scroll):
-        screen.blit(self.image, (self.rect.x + screen_scroll, self.rect.y))
+    def draw(self, screen, camera_x):
+        '''
+        Draws this Item box after setting the camera position.
+        '''                
+        screen.blit(self.image, (self.rect.x + camera_x, self.rect.y))
 
 
 class Explosion(pygame.sprite.Sprite):
-    ''' Animation sequence object for an exploding grenade. '''
+    '''
+    Animation sequence object for an exploding grenade.
+    '''
 
-    animation_list = []
+    # Load media from disk into shared memory for each instance to copy
+    animations = []
     num_of_frames = len(listdir(f'img/explosion'))
     for i in range(num_of_frames):
-        img = pygame.image.load(f'img/explosion/exp{i}.png').convert_alpha()
-        animation_list.append(img)
+        img = pygame.image.load(f'img/explosion/exp{i}.png')
+        new_width = int(img.get_width() * 2)
+        new_height = int(img.get_height() * 2)
+        img = pygame.transform.scale(img, (new_width, new_height))
+        animations.append(img.convert_alpha())
     sound_fx = pygame.mixer.Sound('audio/grenade.wav')
     sound_fx.set_volume(1)
 
-    def __init__(self, x, y, scale=1):
+    def __init__(self, x, y):
+        '''
+        Initialize Explosion object; an animation sequence for grenades.
+        '''
         super().__init__()
-        self.frames = []
         self.frame_idx = 0
         self.counter = 0
-        num_of_frames = len(Explosion.animation_list)
-        for i in range(num_of_frames):
-            img = Explosion.animation_list[i]             # TODO: try to move into class variable
-            new_width = int(img.get_width() * scale)
-            new_height = int(img.get_height() * scale)
-            img = pygame.transform.scale(img, (new_width, new_height))
-            self.frames.append(img)
-        self.image = self.frames[self.frame_idx]
-        self.rect = self.frames[self.frame_idx].get_rect()
+        self.animations = Explosion.animations
+        self.image = self.animations[self.frame_idx]
+        self.rect = self.image.get_rect()
         self.rect.center = (x, y)
+        self.animation_time = get_ticks()
         Explosion.sound_fx.play()
 
     def update(self):
-        ANIMATION_COOLDOWN = 4
-        self.counter += 1
-        if self.counter > ANIMATION_COOLDOWN:
-            self.counter = 0
+        '''
+        Updates the explosion animation sequence.
+        '''
+        if get_ticks() > self.animation_time + ANIMATION_DELAY:
+            self.animation_time = get_ticks()
             self.frame_idx += 1
-            if self.frame_idx >= len(self.frames):
+            if self.frame_idx >= len(self.animations):
                 self.kill()
             else:
-                self.image = self.frames[self.frame_idx]
+                self.image = self.animations[self.frame_idx]
 
-    def draw(self, screen, screen_scroll):
-        screen.blit(self.image, (self.rect.x + screen_scroll, self.rect.y))
+    def draw(self, screen, camera_x):
+        '''
+        Draws this Item box after setting the camera position.
+        '''                
+        screen.blit(self.image, (self.rect.x + camera_x, self.rect.y))
 

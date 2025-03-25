@@ -1,7 +1,6 @@
 import pygame
 from settings import SCREEN_WIDTH, SCREEN_HEIGHT
-from colors import WHITE, RED, GREEN
-from enum import Enum
+from enum import IntEnum
 
 
 class GameButton():
@@ -50,7 +49,7 @@ class GameButton():
         self.clicked = False
 
 
-class FadeType(Enum):
+class FadeType(IntEnum):
     INTRO_EVENT = 0
     LEVEL_EVENT = 1
     DEATH_EVENT = 2

@@ -1,208 +1,226 @@
 import os
 import random
 import pygame
+from pygame.time import get_ticks
 from weapons import Bullet, Grenade
 from settings import Direction, Action
+from settings import (SOLDIER_SCALE_VALUE, SOLDIER_JUMP_STRENGTH,
+                      PLAYER_SHOOT_DELAY, PLAYER_THROW_DELAY,
+                      SOLDIER_SHOOT_DELAY, SOLDIER_THROW_DELAY,
+                      ANIMATION_DELAY)
 
-
-# TODO: Cleanup
 
 # All soldiers share these common animation types
 animation_types = ['Idle', 'Run', 'Jump', 'Death']
 
+def generate_animation_frames(base_dirpath):
+    '''
+    Generates an ordered list of animation frames containing every image in a
+    file directory. There are four different animation types and the animation
+    sequence for each must be in an appropriately named subdirectory: 'Idle',
+    'Run', 'Jump', and 'Death'. The images must be named 1.png, 2.png, 3.png,
+    etc. There is no restriction on the number of images in the sequence.
+    '''
 
-class Soldier(pygame.sprite.Sprite):
-
-    fx_jump = pygame.mixer.Sound('audio/jump.wav')
-    fx_jump.set_volume(0.5)
-
-    animation_images = {}
+    animation_images = []
     for action in animation_types:
         image_list = []
-        frame_count = len(os.listdir(f'img/enemy/{action}'))
+        frame_count = len(os.listdir(f'{base_dirpath}/{action}'))
         for i in range(frame_count):
-            img = pygame.image.load(f'img/enemy/{action}/{i}.png')
+            img = pygame.image.load(f'{base_dirpath}/{action}/{i}.png')
+            scaled_width = int(img.get_width() * SOLDIER_SCALE_VALUE)
+            scaled_height = int(img.get_height() * SOLDIER_SCALE_VALUE)
             img = img.convert_alpha()
+            img = pygame.transform.scale(img, (scaled_width, scaled_height))
             image_list.append(img)
-        animation_images[action] = image_list
+        animation_images.append(image_list)
+    return animation_images
 
-    def __init__(self, x, y, type='player', scale=2, speed=5, health=100, ammo=20, grenades=5):
+
+class Soldier(pygame.sprite.Sprite):
+    '''
+    Base class for a soldier object that can be used for all human sprites.
+    '''
+
+    # Load media from disk into shared memory for each instance to copy
+    jump_fx = pygame.mixer.Sound('audio/jump.wav')
+    jump_fx.set_volume(0.5)
+    animations = generate_animation_frames('img/enemy')
+
+    def __init__(self, x, y, speed=3, health=100, ammo=20, grenades=5):
+        '''
+        Initializes a Soldier object by setting all the default values.
+        '''        
         super().__init__()
         self.alive = True
-        self.type = type
-        self.scale = scale
+        self.health = health
         self.speed = speed
-        self.start_ammo = ammo
-        self.ammo = self.start_ammo
-        self.max_ammo = self.start_ammo * 2
-        self.start_grenades = grenades
-        self.grenades = self.start_grenades
-        self.max_grenades = self.start_grenades * 2
-        self.grenade_cooldown = 0
-        self.shoot_cooldown = 0
+        self.ammo = ammo
+        self.grenades = grenades
+        self.max_ammo = ammo * 2
+        self.max_grenades = grenades * 2
         self.max_health = health
-        self.health = self.max_health
         self.direction = Direction.RIGHT
         self.vel_y = 0
         self.vel_x = 0
-        self.in_air = True # TODO: should start False?
+        self.in_air = True
         self.jump = False
-        self.flip = False
-        self.world_view = None
+        self.flip_imgx = False
+        self.world_state = None
 
         # Action/Animation sprite related variables
+        self.animations = Soldier.animations
         self.action = Action.IDLE
         self.frame_idx = 0
-        self.animation_list = []
-        for action in animation_types:
-            frame_list = []
-            frame_count = len(Soldier.animation_images[action])
-            for i in range(frame_count):
-                img = Soldier.animation_images[action][i]
-                new_width = int(img.get_width() * scale)
-                new_height = int(img.get_height() * scale)
-                img = pygame.transform.scale(img, (new_width, new_height))
-                frame_list.append(img)
-            self.animation_list.append(frame_list)
-        self.image = self.animation_list[self.action.value][self.frame_idx]
+        self.image = self.animations[self.action][self.frame_idx]
         self.rect = self.image.get_rect()
-        # Adjusts the rectangle to be slightly smaller than image so that the player falls through tile gaps
+        self.animation_time = get_ticks()
+        self.shoot_time = self.animation_time
+        self.throw_time = self.animation_time
+        self.shoot_delay = SOLDIER_SHOOT_DELAY
+        self.throw_delay = SOLDIER_THROW_DELAY
+
+        # Adjusts the rectangle to be slightly smaller than image so that the
+        # player falls through tile gaps; otherwise the player float on air
         self.rect.x += 3
-        self.rect.width -= 6
         self.rect.y -= 1
+        self.rect.width -= 6
         self.rect.height -= 2
         self.rect.center = (x, y)
-        #self.width = self.image.get_width()
-        #self.height = self.image.get_height()
-        self.update_time = pygame.time.get_ticks()
 
-    def update(self, world_view, new_action=None):
-        ANIMATION_COOLDOWN = 100
+    def update(self, world_state, new_action=None):
+        '''
+        Updates the soldier's internal variables with each iteration through
+        the game loop. Mostly used for animation sequences.
+        '''
 
-        self.world_view = world_view
+        # The AI will need a view into the world
+        self.world_state = world_state
         
+        # Update animation type (e.g., Idle -> Run)
         if new_action is not None and new_action != self.action:
+            self.animation_time = get_ticks()
             self.action = new_action
             self.frame_idx = 0
-            self.update_time = pygame.time.get_ticks()
-        self.image = self.animation_list[self.action.value][self.frame_idx]
+        self.image = self.animations[self.action][self.frame_idx]
 
-        if pygame.time.get_ticks() > self.update_time + ANIMATION_COOLDOWN:
-            self.update_time = pygame.time.get_ticks()
+        # Update timed sequences like animation frames
+        if get_ticks() > self.animation_time + ANIMATION_DELAY:
+            self.animation_time = get_ticks()
             self.frame_idx += 1
-        if self.frame_idx >= len(self.animation_list[self.action.value]):
+        
+        # Animation rollover (except for the death sequence)
+        if self.frame_idx >= len(self.animations[self.action]):
             if self.action == Action.DEATH:
-                self.frame_idx = len(self.animation_list[self.action.value]) - 1
+                self.frame_idx = len(self.animations[self.action]) - 1
             else:
                 self.frame_idx = 0
         
-        # cooldown timers
-        if self.shoot_cooldown > 0:
-            self.shoot_cooldown -= 1
-        if self.grenade_cooldown > 0:
-            self.grenade_cooldown -= 1
+        # Nothing particularly interesting to return
+        return None
 
-    def move(self, moving_left, moving_right, jump):
+    def move(self, mleft_cmd, mright_cmd, jump_cmd):
+        '''
+        Initiates jumping and lateral movements from the Soldier by setting
+        initial velocities. It is a response to input from buttons on the
+        controller. The physics engine is responsible for tracking/updating
+        the position and velocity of the Soldier over time.
+        '''
 
         # Handle vertical movement
-        if jump == True and self.in_air == False:
-            Soldier.fx_jump.play()
-            self.vel_y = -13
+        if jump_cmd and not self.in_air:
+            Soldier.jump_fx.play()
+            self.vel_y = SOLDIER_JUMP_STRENGTH
             self.in_air = True
 
         # Handle lateral movement
-        if moving_left and not moving_right:
-            self.vel_x = self.speed
-            self.flip = True
+        if mleft_cmd and not mright_cmd:
             self.direction = Direction.LEFT
-        elif moving_right and not moving_left:
             self.vel_x = self.speed
-            self.flip = False
+            self.flip_imgx = True
+        elif mright_cmd and not mleft_cmd:
             self.direction = Direction.RIGHT
+            self.vel_x = self.speed
+            self.flip_imgx = False
         else:
+            # holding both buttons simultaneously
             self.vel_x = 0
 
     def landed(self, impact_velocity):
+        '''
+        The physics engine calls this function when the Soldier is jumping and
+        hits the ground. It records the fact that the soldier can jump again.
+        '''
         self.vel_y = 0
         self.in_air = False
 
     def shoot(self):
-        if self.ammo > 0:
+        '''
+        Shoots a bullet if the Soldier has one. This function calculates the 
+        physical xy-location bullet and its direction of travel. The physics
+        engine is responsible for calculating its movements.
+
+        It's important that the bullet starts outside of the Soldier's rect
+        or the game engine will detect it as a suicide shot.
+        '''
+
+        if (self.ammo > 0 
+                and get_ticks() > self.shoot_time + self.shoot_delay):
             self.ammo -= 1
-            dx = int(self.rect.size[0] * 0.6 * self.direction.value)
-            x = self.rect.centerx + dx
+            self.shoot_time = get_ticks()
+            x_offset = int(self.rect.size[0] * 0.6 * self.direction.value)
+            x = self.rect.centerx + x_offset
             y = self.rect.centery
             return Bullet(x, y, self.direction)
         else:
             return None
 
     def throw(self):
-        if self.grenades > 0:
+        '''
+        Throws a grenade if the Soldier has one. This function calculates the 
+        physical xy-location grenade and its direction of travel. The physics
+        engine is responsible for calculating its movements.
+        '''
+        if (self.grenades > 0 
+                and get_ticks() > self.throw_time + self.throw_delay):
             self.grenades -= 1
-            dx = int(self.rect.size[0] * 0.2 * self.direction.value)
-            #dy = -int(self.rect.size[1] * 0.2)
-            x = self.rect.centerx + dx
-            y = self.rect.top#self.rect.centery + dy
+            self.throw_time = get_ticks()
+            x_offset = int(self.rect.size[0] * 0.2 * self.direction.value)
+            x = self.rect.centerx + x_offset
+            y = self.rect.top
             return Grenade(x, y, self.direction)
         else:
             return None
 
     def death(self):
-        self.update(False, Action.DEATH)
+        '''
+        Kills this Soldier by updating the animation and clearing variables.
+        '''
         self.health = 0
-        self.speed = 0
         self.vel_x = 0
+        self.update(False, Action.DEATH)
         self.alive = False
 
-    def draw(self, screen, screen_scroll):
-        img = pygame.transform.flip(self.image, self.flip, False)
-        screen.blit(img, (self.rect.x + screen_scroll, self.rect.y))
+    def draw(self, screen, camera_x):
+        '''
+        Draws this Soldier after flipping and setting camera position.
+        '''
+        img = pygame.transform.flip(self.image, self.flip_imgx, False)
+        screen.blit(img, (self.rect.x + camera_x, self.rect.y))
 
     
 
 class Enemy(Soldier):
-    # Images for enemy animation
-    animation_images = {}
-    for action in animation_types:
-        image_list = []
-        frame_count = len(os.listdir(f'img/enemy/{action}'))
-        for i in range(frame_count):
-            img = pygame.image.load(f'img/enemy/{action}/{i}.png')
-            img = img.convert_alpha()
-            image_list.append(img)
-        animation_images[action] = image_list
 
-
-    def __init__(self, x, y, type='player', scale=2, speed=5, health=100, ammo=20, grenades=5):
-        super().__init__(x, y, type, scale, speed, health, ammo, grenades)
-        
-        # AI related variables
+    def __init__(self, x, y, speed=3, health=100, ammo=20, grenades=5):
+        '''
+        Initializes an Enemy object by setting animation frames and delays.
+        '''        
+        super().__init__(x, y, speed, health, ammo, grenades)
         self.move_counter = 0
         self.vision = pygame.Rect(0, 0, 450, self.rect.height)
         self.idling = False
         self.idling_counter = 0
-
-        # Animation related variables
-        # TODO: is there a way to make use of class instance? Only thing is scale        
-        self.animation_list = []
-        for action in animation_types:
-            frame_list = []
-            frame_count = len(Enemy.animation_images[action])
-            for i in range(frame_count):
-                img = Enemy.animation_images[action][i]
-                new_width = int(img.get_width() * scale)
-                new_height = int(img.get_height() * scale)
-                img = pygame.transform.scale(img, (new_width, new_height))
-                frame_list.append(img)
-            self.animation_list.append(frame_list)
-
-    def shoot(self):
-        self.shoot_cooldown = 100
-        return super().shoot()
-
-    def throw(self):
-        self.grenade_cooldown = 200
-        return super().throw()
 
     def ai_shoot(self):
         self.update(Action.IDLE)
@@ -256,39 +274,21 @@ class Enemy(Soldier):
 
 
 class Player(Soldier):
+    '''
+    This class creates the main character in the game. Usually, this means an
+    interactive human player but it's also possible for the character to be
+    controlled by a special AI agent.
+    '''
 
-    # Images for player animation
-    animation_images = {}
-    for action in animation_types:
-        image_list = []
-        frame_count = len(os.listdir(f'img/player/{action}'))
-        for i in range(frame_count):
-            img = pygame.image.load(f'img/player/{action}/{i}.png')
-            img = img.convert_alpha()
-            image_list.append(img)
-        animation_images[action] = image_list
+    # Player is a different color than the enemies
+    animations = generate_animation_frames('img/player')
 
-    def __init__(self, x, y, type='player', scale=2, speed=5, health=100, ammo=20, grenades=5):
-        super().__init__(x, y, type, scale, speed, health, ammo, grenades)
+    def __init__(self, x, y, speed=5, health=100, ammo=20, grenades=5):
+        '''
+        Initializes a Player object by setting animation frames and delays.
+        '''
+        super().__init__(x, y, speed, health, ammo, grenades)
+        self.animations = Player.animations
+        self.shoot_delay = PLAYER_SHOOT_DELAY
+        self.throw_delay = PLAYER_THROW_DELAY
 
-        # Animation related variables
-        # TODO: is there a way to make use of class instance? Only thing is scale
-        self.animation_list = []
-        for action in animation_types:
-            frame_list = []
-            frame_count = len(Player.animation_images[action])
-            for i in range(frame_count):
-                img = Player.animation_images[action][i]
-                new_width = int(img.get_width() * scale)
-                new_height = int(img.get_height() * scale)
-                img = pygame.transform.scale(img, (new_width, new_height))
-                frame_list.append(img)
-            self.animation_list.append(frame_list)
-
-    def shoot(self):
-        self.shoot_cooldown = 10
-        return super().shoot()
-
-    def throw(self):
-        self.grenade_cooldown = 100
-        return super().throw()

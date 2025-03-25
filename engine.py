@@ -121,10 +121,10 @@ class GameEngine():
             decoration_tile = Decoration(img, rect.x, rect.y)
             self.decoration_group.add(decoration_tile)
         elif tile == PLAYER_TILE_ID:
-            self.player = Player(rect.x, rect.y, 'player', 1.65)
+            self.player = Player(rect.x, rect.y)
             self.health_bar = HealthBar(10, 10, self.player.max_health)
         elif tile == ENEMY_TILE_ID:
-            enemy = Enemy(rect.x, rect.y, 'enemy', 1.65, 2)
+            enemy = Enemy(rect.x, rect.y)
             self.enemy_group.add(enemy)
         elif tile == AMMO_TILE_ID:
             item = ItemBox(rect.x, rect.y, 'ammo')
@@ -174,12 +174,14 @@ class GameEngine():
     
     def player_actions(self, controller):
         if self.player.alive:
-            if controller.shoot and self.player.ammo > 0 and self.player.shoot_cooldown == 0:
+            if controller.shoot:
                 bullet = self.player.shoot()
-                self.bullet_group.add(bullet)
-            if controller.throw and self.player.grenades > 0 and self.player.grenade_cooldown == 0:
+                if bullet:
+                    self.bullet_group.add(bullet)
+            if controller.throw:
                 grenade = self.player.throw()
-                self.grenade_group.add(grenade)
+                if grenade:
+                    self.grenade_group.add(grenade)
 
             self.player.move(controller.mleft, controller.mright, controller.jump)
 
@@ -197,11 +199,10 @@ class GameEngine():
         for enemy in self.enemy_group:
             if enemy.alive:
                 if (self.player.alive 
-                        and enemy.vision.colliderect(self.player.rect)
-                        and enemy.ammo > 0 
-                        and enemy.shoot_cooldown == 0):
+                        and enemy.vision.colliderect(self.player.rect)):
                     bullet = enemy.ai_shoot()
-                    self.bullet_group.add(bullet)
+                    if bullet:
+                        self.bullet_group.add(bullet)
                 enemy.ai_move()
                 if enemy.health <= 0:
                     enemy.death()
@@ -238,9 +239,9 @@ class GameEngine():
         Check for exploding grenades and initiate animation.
         '''
         for grenade in self.grenade_group:
-            if grenade.fuse_timer <= 0:
+            if grenade.do_explosion:
                 # Animate with an explosion
-                explosion = Explosion(grenade.rect.x, grenade.rect.y, 0.75)
+                explosion = Explosion(grenade.rect.x, grenade.rect.y)
                 self.explosion_group.add(explosion)
                 grenade.kill()
                 # Calculate damage against player
