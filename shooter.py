@@ -1,7 +1,7 @@
 
 # Initialize the display and sound before importing any other modules
 import pygame
-from settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
+from settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, COLOR
 pygame.init()
 pygame.mixer.init()
 pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -11,7 +11,6 @@ pygame.display.set_caption('Shooter')
 from controller import GameController
 from widgets import GameButton, GameFade, FadeType
 from engine import GameEngine, GameModes
-from colors import BG_COLOR, PINK, BLACK
 
 # Create IO devices:
 #  1) controller for input
@@ -62,14 +61,15 @@ def handle_keyboard_events(event: pygame.event.Event,
 
 def run_main_menu(engine: GameEngine, 
                   controller: GameController, 
-                  screen: pygame.Surface) -> None:
+                  screen: pygame.Surface,
+                  events: pygame.event) -> None:
     '''
     Displays the main menu. This interface is the primary method for human
     players to click on a button and start a new, interactive game.
     '''
 
     # Draw the main menu
-    screen.fill(BG_COLOR)
+    screen.fill(COLOR.BACKGROUND)
     start_button.draw(screen)
     exit_button.draw(screen)
 
@@ -82,7 +82,7 @@ def run_main_menu(engine: GameEngine,
         engine.game_mode = GameModes.QUIT
 
     # Handle the various ways to quit game
-    for event in pygame.event.get():
+    for event in events:
         if (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
                 or event.type == pygame.QUIT):
             engine.game_mode = GameModes.QUIT
@@ -93,7 +93,8 @@ def run_main_menu(engine: GameEngine,
 
 def run_interactive_game(engine: GameEngine,
                          controller: GameController, 
-                         screen: pygame.Surface) -> None:
+                         screen: pygame.Surface,
+                         events: pygame.event) -> None:
     '''
     Plays an interactive game between a human player and the computer AI. If
     the player advances to the next level, we will stay in interactive mode.
@@ -132,7 +133,7 @@ def run_interactive_game(engine: GameEngine,
             intro_fade.begin_fade()
 
     # Handle the various controller inputs to the game
-    for event in pygame.event.get():
+    for event in events:
         if event.type == pygame.QUIT:
             engine.game_mode = GameModes.QUIT
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -158,27 +159,21 @@ if __name__ == '__main__':
     exit_button_y = SCREEN_HEIGHT // 2 - exit_button_img.get_height() + 100
     exit_button = GameButton(exit_button_img, exit_button_x, exit_button_y)
 
-    # Define notable game events and their transitions
-    INTRO_EVENT = pygame.USEREVENT + 1
-    LEVEL_EVENT = pygame.USEREVENT + 2
-    DEATH_EVENT = pygame.USEREVENT + 3
-    intro_fade = GameFade(FadeType.INTRO_EVENT, BLACK)
-    level_fade = GameFade(FadeType.LEVEL_EVENT, BLACK)
-    death_fade = GameFade(FadeType.DEATH_EVENT, PINK)
+    # Define notable game transitions
+    intro_fade = GameFade(FadeType.INTRO_EVENT, COLOR.BLACK)
+    level_fade = GameFade(FadeType.LEVEL_EVENT, COLOR.BLACK)
+    death_fade = GameFade(FadeType.DEATH_EVENT, COLOR.PINK)
 
     # The main game loop has several states, each handled separately:
     #   1. 'Menu' where the player can choose between options
     #   2. 'Interactive' where a human player plays the game
     while engine.game_mode != GameModes.QUIT:
+        events = pygame.event.get()
         if engine.game_mode == GameModes.MENU:
-            run_main_menu(engine, controller, screen)
+            run_main_menu(engine, controller, screen, events)
         elif engine.game_mode == GameModes.INTERACTIVE:
-            run_interactive_game(engine, controller, screen)
+            run_interactive_game(engine, controller, screen, events)
             health_pct = engine.player.health / engine.player.max_health
-            #health_bar.draw(screen, health_pct)
-            #draw_text(screen, f'GRNADE: {engine.player.grenades}', WHITE, 10, 35)
-            #draw_text(screen, f'ROUNDS: {engine.player.ammo}', WHITE, 10, 60)       
-        
         clock.tick(FPS)
         pygame.display.flip()
     pygame.quit()

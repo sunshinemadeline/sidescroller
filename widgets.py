@@ -3,13 +3,15 @@ from settings import SCREEN_WIDTH, SCREEN_HEIGHT
 from enum import IntEnum
 
 
+class MouseButton(IntEnum):
+    LEFT_MBUTTON = 0
+    MIDDLE_MBUTTON = 1
+    RIGHT_MBUTTON = 2
+
 class GameButton():
     '''
     A simple button for a PyGame GUI window.
     '''
-    LEFT_MBUTTON = 0
-    MIDDLE_MBUTTON = 1
-    RIGHT_MBUTTON = 2
 
     def __init__(self, image, x, y, scale=1.0):
         '''
@@ -35,7 +37,7 @@ class GameButton():
         mouse_pos = pygame.mouse.get_pos()
         mouse_clicked = pygame.mouse.get_pressed()
         if self.rect.collidepoint(mouse_pos):
-            if mouse_clicked[GameButton.LEFT_MBUTTON] and not self.clicked:
+            if mouse_clicked[MouseButton.LEFT_MBUTTON] and not self.clicked:
                 self.clicked = True
                 return True
         else:
@@ -104,5 +106,4 @@ class GameFade():
         self.counter += self.speed
         if self.counter >= SCREEN_WIDTH:
             self.finished = True
-            #self.started = False
 

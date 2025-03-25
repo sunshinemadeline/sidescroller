@@ -3,55 +3,63 @@ import random
 import pygame
 from pygame.time import get_ticks
 from weapons import Bullet, Grenade
-from settings import Direction, Action
-from settings import (SOLDIER_SCALE_VALUE, SOLDIER_JUMP_STRENGTH,
-                      PLAYER_SHOOT_DELAY, PLAYER_THROW_DELAY,
-                      SOLDIER_SHOOT_DELAY, SOLDIER_THROW_DELAY,
-                      ANIMATION_DELAY)
+from settings import Direction, Action, ENVIRONMENT, TILEMAP
 
 
 # All soldiers share these common animation types
 animation_types = ['Idle', 'Run', 'Jump', 'Death']
-
-def generate_animation_frames(base_dirpath):
-    '''
-    Generates an ordered list of animation frames containing every image in a
-    file directory. There are four different animation types and the animation
-    sequence for each must be in an appropriately named subdirectory: 'Idle',
-    'Run', 'Jump', and 'Death'. The images must be named 1.png, 2.png, 3.png,
-    etc. There is no restriction on the number of images in the sequence.
-    '''
-
-    animation_images = []
-    for action in animation_types:
-        image_list = []
-        frame_count = len(os.listdir(f'{base_dirpath}/{action}'))
-        for i in range(frame_count):
-            img = pygame.image.load(f'{base_dirpath}/{action}/{i}.png')
-            scaled_width = int(img.get_width() * SOLDIER_SCALE_VALUE)
-            scaled_height = int(img.get_height() * SOLDIER_SCALE_VALUE)
-            img = img.convert_alpha()
-            img = pygame.transform.scale(img, (scaled_width, scaled_height))
-            image_list.append(img)
-        animation_images.append(image_list)
-    return animation_images
-
 
 class Soldier(pygame.sprite.Sprite):
     '''
     Base class for a soldier object that can be used for all human sprites.
     '''
 
-    # Load media from disk into shared memory for each instance to copy
-    jump_fx = pygame.mixer.Sound('audio/jump.wav')
-    jump_fx.set_volume(0.5)
-    animations = generate_animation_frames('img/enemy')
+    animations = {}
+    jump_fx = None
 
-    def __init__(self, x, y, speed=3, health=100, ammo=20, grenades=5):
+    @classmethod
+    def load_assets(cls, base_dirpath, soldier_type):
+        """Preload animations and sounds into shared memory for reuse."""
+        if soldier_type not in cls.animations:
+            cls.animations[soldier_type] = cls._load_animations(base_dirpath)
+            
+        if cls.jump_fx is None:
+            cls.jump_fx = pygame.mixer.Sound('audio/jump.wav')
+            cls.jump_fx.set_volume(0.5)
+
+    @staticmethod
+    def _load_animations(base_dirpath):
+        '''
+        Generates an ordered list of animation frames containing every image in a
+        file directory. There are four different animation types and the animation
+        sequence for each must be in an appropriately named subdirectory: 'Idle',
+        'Run', 'Jump', and 'Death'. The images must be named 1.png, 2.png, 3.png,
+        etc. There is no restriction on the number of images in the sequence.
+        '''
+
+        animation_images = []
+        for action in animation_types:
+            action_dir = f'{base_dirpath}/{action}'
+            image_list = []
+            frame_count = len(os.listdir(action_dir))
+            for i in range(frame_count):
+                img = pygame.image.load(f'{action_dir}/{i}.png')
+                scaled_width = int(img.get_width() * ENVIRONMENT.SOLDIER_SCALE)
+                scaled_height = int(img.get_height() * ENVIRONMENT.SOLDIER_SCALE)
+                img = img.convert_alpha()
+                img = pygame.transform.scale(img, (scaled_width, scaled_height))
+                image_list.append(img)
+            animation_images.append(image_list)
+        return animation_images
+    
+
+    def __init__(self, x, y, kind, speed=3, health=100, ammo=20, grenades=5):
         '''
         Initializes a Soldier object by setting all the default values.
         '''        
         super().__init__()
+        Soldier.load_assets(f'img/{kind}', kind)
+
         self.alive = True
         self.health = health
         self.speed = speed
@@ -65,20 +73,20 @@ class Soldier(pygame.sprite.Sprite):
         self.vel_x = 0
         self.in_air = True
         self.jump = False
-        self.flip_imgx = False
+        #self.flip_imgx = False
         self.world_state = None
 
         # Action/Animation sprite related variables
-        self.animations = Soldier.animations
-        self.action = Action.IDLE
         self.frame_idx = 0
-        self.image = self.animations[self.action][self.frame_idx]
+        self.action = Action.IDLE
+        self.animations = Soldier.animations
+        self.image = self.animations[kind][self.action][self.frame_idx]
         self.rect = self.image.get_rect()
         self.animation_time = get_ticks()
         self.shoot_time = self.animation_time
         self.throw_time = self.animation_time
-        self.shoot_delay = SOLDIER_SHOOT_DELAY
-        self.throw_delay = SOLDIER_THROW_DELAY
+        self.shoot_delay = ENVIRONMENT.SOLDIER_SHOOT_DELAY
+        self.throw_delay = ENVIRONMENT.SOLDIER_THROW_DELAY
 
         # Adjusts the rectangle to be slightly smaller than image so that the
         # player falls through tile gaps; otherwise the player float on air
@@ -88,34 +96,36 @@ class Soldier(pygame.sprite.Sprite):
         self.rect.height -= 2
         self.rect.center = (x, y)
 
-    def update(self, world_state, new_action=None):
+    def update(self):
         '''
         Updates the soldier's internal variables with each iteration through
         the game loop. Mostly used for animation sequences.
         '''
 
-        # The AI will need a view into the world
-        self.world_state = world_state
-        
-        # Update animation type (e.g., Idle -> Run)
-        if new_action is not None and new_action != self.action:
+        # Handle player animations
+        new_action = (Action.JUMP if self.in_air 
+                      else Action.RUN if self.vel_x != 0 
+                      else Action.DEATH if not self.alive
+                      else Action.IDLE)
+        if new_action != self.action:
             self.animation_time = get_ticks()
             self.action = new_action
             self.frame_idx = 0
-        self.image = self.animations[self.action][self.frame_idx]
 
         # Update timed sequences like animation frames
-        if get_ticks() > self.animation_time + ANIMATION_DELAY:
+        if get_ticks() > self.animation_time + ENVIRONMENT.ANIMATION_DELAY:
             self.animation_time = get_ticks()
             self.frame_idx += 1
+            # Animation rollover (except for the death sequence)
+            if self.frame_idx >= len(self.animations[self.action]):
+                if self.action == Action.DEATH:
+                  self.frame_idx = len(self.animations[self.action]) - 1
+                else:
+                    self.frame_idx = 0
         
-        # Animation rollover (except for the death sequence)
-        if self.frame_idx >= len(self.animations[self.action]):
-            if self.action == Action.DEATH:
-                self.frame_idx = len(self.animations[self.action]) - 1
-            else:
-                self.frame_idx = 0
-        
+        # Update the animation frame
+        self.image = self.animations[self.action][self.frame_idx]
+
         # Nothing particularly interesting to return
         return None
 
@@ -130,18 +140,16 @@ class Soldier(pygame.sprite.Sprite):
         # Handle vertical movement
         if jump_cmd and not self.in_air:
             Soldier.jump_fx.play()
-            self.vel_y = SOLDIER_JUMP_STRENGTH
+            self.vel_y = ENVIRONMENT.SOLDIER_JUMP_STRENGTH
             self.in_air = True
 
         # Handle lateral movement
         if mleft_cmd and not mright_cmd:
             self.direction = Direction.LEFT
             self.vel_x = self.speed
-            self.flip_imgx = True
         elif mright_cmd and not mleft_cmd:
             self.direction = Direction.RIGHT
             self.vel_x = self.speed
-            self.flip_imgx = False
         else:
             # holding both buttons simultaneously
             self.vel_x = 0
@@ -168,8 +176,7 @@ class Soldier(pygame.sprite.Sprite):
                 and get_ticks() > self.shoot_time + self.shoot_delay):
             self.ammo -= 1
             self.shoot_time = get_ticks()
-            x_offset = int(self.rect.size[0] * 0.6 * self.direction.value)
-            x = self.rect.centerx + x_offset
+            x = self.rect.centerx + (30 * self.direction) # 30 is hack
             y = self.rect.centery
             return Bullet(x, y, self.direction)
         else:
@@ -198,80 +205,92 @@ class Soldier(pygame.sprite.Sprite):
         '''
         self.health = 0
         self.vel_x = 0
-        self.update(False, Action.DEATH)
         self.alive = False
 
     def draw(self, screen, camera_x):
         '''
         Draws this Soldier after flipping and setting camera position.
         '''
-        img = pygame.transform.flip(self.image, self.flip_imgx, False)
+        flip_imgx = True if self.direction == Direction.LEFT else False
+        img = pygame.transform.flip(self.image, flip_imgx, False)
         screen.blit(img, (self.rect.x + camera_x, self.rect.y))
 
-    
 
 class Enemy(Soldier):
 
-    def __init__(self, x, y, speed=3, health=100, ammo=20, grenades=5):
+    def __init__(self, x, y, speed=2, health=100, ammo=20, grenades=5):
         '''
         Initializes an Enemy object by setting animation frames and delays.
         '''        
-        super().__init__(x, y, speed, health, ammo, grenades)
+        super().__init__(x, y, 'enemy', speed, health, ammo, grenades)
+        self.animations = Soldier.animations['enemy']
+
         self.move_counter = 0
-        self.vision = pygame.Rect(0, 0, 450, self.rect.height)
+        self.vision = pygame.Rect(x, y, 450, 5)
         self.idling = False
         self.idling_counter = 0
 
-    def ai_shoot(self):
-        self.update(Action.IDLE)
-        self.idling = True
-        self.idling_counter = random.randint(20, 40)
-        return self.shoot()
-
-    def ai_move(self, movement_counter=50):
-        if self.idling == False and random.randint(1, 1000) < 5:
-            self.update(Action.IDLE)
-            self.idling = True
-            self.idling_counter = random.randint(20, 40)
-
-        # handle idling
+    def ai_move(self, world_map, tile_size, movement_limit=200):
+        '''
+        AI movement, ensuring enemies don't walk into walls or off cliffs.
+        '''
+       
+        # If enemy is idling, stop moving
         if self.idling:
+            self.vel_x = 0
             self.idling_counter -= 1
             if self.idling_counter <= 0:
                 self.idling = False
+                self.move_counter = 0
+            return
+
+        # Calculate tiles in front of enemy position
+        tile_x = self.rect.centerx // tile_size
+        tile_y = self.rect.centery // tile_size
+        tile_ahead_x = tile_x + self.direction
+        tile_below_y = tile_y + 1
+        tile_ahead = world_map[tile_y][tile_ahead_x]
+        tile_below = world_map[tile_below_y][tile_ahead_x]
+
+        # Check for walls, cliffs, and random behavior
+        wall_ahead = False
+        cliff_ahead = False
+        random_turn = False
+        if (tile_ahead >= TILEMAP.DIRT_TILE_FIRST and
+                tile_ahead <= TILEMAP.DIRT_TILE_LAST):
+            wall_ahead = True
+        elif (tile_below == TILEMAP.EMPTY_TILE or
+                (tile_below >= TILEMAP.WATER_TILE_FIRST
+                 and tile_below <= TILEMAP.WATER_TILE_LAST)):
+            cliff_ahead = True
+        elif random.randint(1, movement_limit) == 1:
+            random_turn = True
+
+        # Reasons to turn and pause
+        if (wall_ahead or cliff_ahead or random_turn 
+                or self.move_counter >= movement_limit):
+            self.direction *= -1
+            self.idling = True
+            self.move_counter = 0
+            self.idling_counter = random.randint(25, 75)                
         
-        # handle movement
+        # Otherwise, move forward
         else:
-            #tile_x = self.rect.x // TILE_SIZE
-            #tile_y = self.rect.y // TILE_SIZE
-            #index_y = len(self.world_view) // 2
-            #index_x = len(self.world_view[0]) // 2
-            if (self.direction == Direction.RIGHT ):
-                    #and self.world_view[index_y][index_x+1] == -1
-                    #and self.world_view[index_y+1][index_x+1] != 1):
-                ai_moving_right = True
-                ai_moving_left = False
-            #elif (self.direction == Direction.LEFT 
-            #        and self.world_view[index_y][index_x-1] == -1
-            #        and self.world_view[index_y+1][index_x-1] != 1):
-            else:
-                ai_moving_right = False
-                ai_moving_left = True
-            self.move(ai_moving_left, ai_moving_right, False)
-            self.update(Action.RUN)
+            ai_moving_right = self.direction == Direction.RIGHT
+            ai_moving_left = not ai_moving_right
+            super().move(ai_moving_left, ai_moving_right, False)
             self.move_counter += 1
 
-            # Update AI vision as the enemy moves
-            dx = self.vision.width // 2 * self.direction.value
-            self.vision.center = (self.rect.centerx + dx, self.rect.centery)
-            #pygame.draw.rect(screen, RED, self.vision)
-
-            if self.move_counter > movement_counter:
-                self.direction *= -1
-                self.move_counter *= -1
-        
-        return None
-
+    def update(self):
+        '''
+        Updates the Enemy by turning head to match the direction he's facing.
+        '''
+        super().update()
+        self.vision.top = self.rect.top
+        if self.direction == Direction.LEFT:
+            self.vision.right = self.rect.left
+        else:
+            self.vision.left = self.rect.right
 
 class Player(Soldier):
     '''
@@ -280,15 +299,11 @@ class Player(Soldier):
     controlled by a special AI agent.
     '''
 
-    # Player is a different color than the enemies
-    animations = generate_animation_frames('img/player')
-
     def __init__(self, x, y, speed=5, health=100, ammo=20, grenades=5):
         '''
         Initializes a Player object by setting animation frames and delays.
         '''
-        super().__init__(x, y, speed, health, ammo, grenades)
-        self.animations = Player.animations
-        self.shoot_delay = PLAYER_SHOOT_DELAY
-        self.throw_delay = PLAYER_THROW_DELAY
-
+        super().__init__(x, y, 'player', speed, health, ammo, grenades)
+        self.animations = Soldier.animations['player']
+        self.shoot_delay = ENVIRONMENT.PLAYER_SHOOT_DELAY
+        self.throw_delay = ENVIRONMENT.PLAYER_THROW_DELAY
