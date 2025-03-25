@@ -5,7 +5,7 @@ Welcome to my fun little side-scrolling shooter game! You play as a Rambo-style 
 This was my first game of any significance. I owe a lot of credit to **[Coding With Russ](https://github.com/russs123/Shooter)** and his fantastic tutorials. I watched several of his videos and borrowed (err, ...copied) his graphics and sounds verbatim. That said, I designed the code from scratch and used a completely different architecture.
 
 ## Structure ##
-There are 
+Although there are a handful of small files, the majority of my game is contained in these three files:
 * `shooter.py:` This is the main game loop. It creates the game controller, screen, and game engine objects. It can run in menu mode, where it displays a basic menu with Start and Exit buttons. If the user clicks Start, then it switches to interactive mode by running the game loop.
 * `solder.py:` Defines the Soldier class, which is the base object for all characters in the game. The file contains two additional classes, Player and Enemy, both of which inherit from Soldier and have a few customizations. Most of the code is pretty straight-forward with the possible exception of 
 * `engine.py:` The largest and most confusing file of them all. This file loads the maps, maintains the overall game state, and calculates
