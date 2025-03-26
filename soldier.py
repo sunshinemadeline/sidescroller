@@ -73,7 +73,6 @@ class Soldier(pygame.sprite.Sprite):
         self.vel_x = 0
         self.in_air = True
         self.jump = False
-        #self.flip_imgx = False
         self.world_state = None
 
         # Action/Animation sprite related variables
@@ -291,6 +290,7 @@ class Enemy(Soldier):
             self.vision.right = self.rect.left
         else:
             self.vision.left = self.rect.right
+
 
 class Player(Soldier):
     '''

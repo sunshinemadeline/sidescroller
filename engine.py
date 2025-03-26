@@ -209,7 +209,6 @@ class GameEngine():
             self.player.health -= bullet.damage
         for enemy in self.groups['enemy']:
             for bullet in spritecollide(enemy, self.groups['bullet'], False):
-                old_health = enemy.health
                 if enemy.health >= 0:
                     enemy.health -= bullet.damage
                     bullet.kill()
