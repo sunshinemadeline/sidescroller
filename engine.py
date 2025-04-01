@@ -10,7 +10,7 @@ from os.path import exists
 from soldier import Player, Enemy
 from weapons import ItemBox, Explosion
 from settings import (SCREEN_HEIGHT, SCREEN_WIDTH, SCROLL_RIGHT, SCROLL_LEFT,
-                      ENVIRONMENT, TILEMAP, COLOR, Direction, GameModes)
+                      ENVIRONMENT, TILEMAP, EnvironmentSettings, COLOR, Direction, GameModes)
 
 
 class GameEngine():
@@ -133,6 +133,9 @@ class GameEngine():
         elif tile == TILEMAP.HEALTH_TILE_ID:
             item = ItemBox(rect.x, rect.y, 'health')
             self.groups['item'].add(item)
+        elif tile == TILEMAP.HEALTH_TILE_ID:
+            item = ItemBox(rect.x, rect.y, 'jump_buff')
+            self.groups['item'].add(item)
         elif tile == TILEMAP.LEVEL_EXIT_TILE_ID:
             exit_tile = GameTile(img, rect.x, rect.y)
             self.groups['exit'].add(exit_tile)
@@ -182,10 +185,20 @@ class GameEngine():
         # Ideally, this code would be within the Player class, but only the
         # game engine knows about the bullet and grenade groups.
         self.player.move(controller.mleft, controller.mright, controller.jump)
+        
+        # Check if the player shoots
         if controller.shoot:
             bullet = self.player.shoot()
             if bullet:
                 self.groups['bullet'].add(bullet)
+
+        # Check for bullet collisions with obstacles
+        for bullet in self.groups['bullet']:
+            for tile in self.groups['obstacle']:
+                if bullet.rect.colliderect(tile.rect):
+                    bullet.kill()  # Destroy the bullet on collision with an obstacle
+                    break  # Exit the loop once the bullet is killed
+
         if controller.throw:
             grenade = self.player.throw()
             if grenade:
@@ -212,7 +225,10 @@ class GameEngine():
         ''' 
         Check if player collected any item boxes and add to inventory.
         '''
+        collect_sound = pygame.mixer.Sound('audio/collect.mp3')
+
         for item in spritecollide(self.player, self.groups['item'], True):
+            collect_sound.play()
             if item.box_type == 'ammo':
                 amount = self.player.ammo + item.quantity
                 self.player.ammo += min(amount, self.player.max_ammo)
@@ -222,6 +238,8 @@ class GameEngine():
             elif item.box_type == 'health':
                 amount = self.player.health + item.quantity
                 self.player.health = min(amount, self.player.max_health)
+            elif item.box_type == 'jump_buff':
+                EnvironmentSettings.SOLDIER_JUMP_STRENGTH = EnvironmentSettings.SOLDIER_JUMP_STRENGTH + 2
     
 
     def handle_bullet_damage(self):
