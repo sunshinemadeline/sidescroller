@@ -11,7 +11,7 @@ class ItemBox(pygame.sprite.Sprite):
     Supplies for the player to collect with ammo, grenades, or health.
     '''
     images = None
-    sound_fx = None    
+    sound_fx = "audio/collect.mp3"   
 
     @classmethod
     def load_assets(cls):
@@ -22,6 +22,7 @@ class ItemBox(pygame.sprite.Sprite):
             'ammo': load(f'img/icons/ammo_box.png').convert_alpha(),
             'health': load(f'img/icons/health_box.png').convert_alpha(),
             'grenade': load(f'img/icons/grenade_box.png').convert_alpha(),
+            'jump_buff': load(f'img/icons/jump_box.png').convert_alpha(),
         }
 
     def __init__(self, x, y, box_type='ammo', quantity=20):
@@ -234,4 +235,6 @@ class Explosion(pygame.sprite.Sprite):
         Draws this Item box after setting the camera position.
         '''                
         screen.blit(self.image, (self.rect.x + camera_x, self.rect.y))
+
+
 
