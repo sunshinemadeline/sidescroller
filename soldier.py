@@ -138,10 +138,13 @@ class Soldier(pygame.sprite.Sprite):
         '''
 
         # Handle vertical movement
+        if self.vel_y > 0:  # Only falling, not jumping up
+            self.in_air = True
         if jump_cmd and not self.in_air:
             Soldier.jump_fx.play()
             self.vel_y = ENVIRONMENT.SOLDIER_JUMP_STRENGTH
             self.in_air = True
+                
 
         # Handle lateral movement
         if mleft_cmd and not mright_cmd:
@@ -161,6 +164,15 @@ class Soldier(pygame.sprite.Sprite):
         '''
         self.vel_y = 0
         self.in_air = False
+
+        FALL_DAMAGE_THRESHOLD = 18  # Adjust this value based on testing
+        DAMAGE_MULTIPLIER = 2  # Scale how much damage is taken per excess speed
+
+        if impact_velocity > FALL_DAMAGE_THRESHOLD:
+            fall_damage = (impact_velocity - FALL_DAMAGE_THRESHOLD) * DAMAGE_MULTIPLIER
+            self.health -= fall_damage
+            if self.health <= 0:
+                self.death()
 
     def shoot(self):
         '''
@@ -308,3 +320,4 @@ class Player(Soldier):
         self.animations = Soldier.animations['player']
         self.shoot_delay = ENVIRONMENT.PLAYER_SHOOT_DELAY
         self.throw_delay = ENVIRONMENT.PLAYER_THROW_DELAY
+
