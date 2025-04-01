@@ -17,8 +17,8 @@ class GameModes(IntEnum):
 
 @dataclass(frozen=True)
 class EnvironmentSettings:
-    GRAVITY = 0.75
-    SOLDIER_JUMP_STRENGTH = -13
+    GRAVITY = 0.70
+    SOLDIER_JUMP_STRENGTH = -11
     BULLET_FULL_DAMAGE = 25
     BULLET_VELOCITY_X = 15
     GRENADE_FULL_DAMAGE = 100
