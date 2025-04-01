@@ -14,12 +14,6 @@ from settings import (SCREEN_HEIGHT, SCREEN_WIDTH, SCROLL_RIGHT, SCROLL_LEFT,
                       ENVIRONMENT, TILEMAP, COLOR, Direction, GameModes)
 
 
-# Intialize background music
-pygame.mixer.music.load('audio/music.mp3')
-pygame.mixer.music.set_volume(0.3)
-pygame.mixer.music.play(-1, 0.0, 2500)
-
-
 class GameEngine():
     '''
     An engine to play the CSC432 side-scrolling shooter game. This class is
@@ -30,32 +24,52 @@ class GameEngine():
     '''
 
     # Load the background images (order matters)
-    bg_img = [
-        pygame.image.load('img/background/sky_cloud.png').convert_alpha(),
-        pygame.image.load('img/background/mountain.png').convert_alpha(),
-        pygame.image.load('img/background/pine1.png').convert_alpha(),
-        pygame.image.load('img/background/pine2.png').convert_alpha()
-    ]
-    bg_ypos = [
-        0,
-        SCREEN_HEIGHT - bg_img[1].get_height() - 200,
-        SCREEN_HEIGHT - bg_img[2].get_height() - 150,
-        SCREEN_HEIGHT - bg_img[3].get_height()
-    ]
-    bg_width = min([img.get_width() for img in bg_img])
+    bg_img = None
+    bg_ypos = None
+    bg_width = 0
+    tile_img_list = None
 
-    # Load all possible foreground tiles
-    tile_img_list = []
-    for tile_num in range(TILEMAP.TILE_TYPE_COUNT):
-        img = load(f'img/tile/{tile_num}.png').convert_alpha()
-        img = scale(img, (TILEMAP.TILE_SIZE, TILEMAP.TILE_SIZE))
-        tile_img_list.append(img)
+    @classmethod
+    def load_assets(cls):
+        '''
+        Preload sounds and background images into shared memory for reuse.
+        '''        
+        # Intialize background music
+        pygame.mixer.music.load('audio/music.mp3')
+        pygame.mixer.music.set_volume(0.3)
+        pygame.mixer.music.play(-1, 0.0, 2500)
+
+        # Load all of the background images
+        if cls.bg_img is None:
+            cls.bg_img = [
+                load('img/background/sky_cloud.png').convert_alpha(),
+                load('img/background/mountain.png').convert_alpha(),
+                load('img/background/pine1.png').convert_alpha(),
+                load('img/background/pine2.png').convert_alpha()
+            ]
+            cls.bg_width = min([img.get_width() for img in cls.bg_img])
+        if cls.bg_ypos is None:
+            cls.bg_ypos = [
+                0,
+                SCREEN_HEIGHT - cls.bg_img[1].get_height() - 200,
+                SCREEN_HEIGHT - cls.bg_img[2].get_height() - 150,
+                SCREEN_HEIGHT - cls.bg_img[3].get_height()
+            ]            
+        
+        # Load all possible foreground tiles
+        if cls.tile_img_list is None:
+            cls.tile_img_list = []
+            for tile_num in range(TILEMAP.TILE_TYPE_COUNT):
+                img = load(f'img/tile/{tile_num}.png').convert_alpha()
+                img = scale(img, (TILEMAP.TILE_SIZE, TILEMAP.TILE_SIZE))
+                cls.tile_img_list.append(img)        
 
 
     def __init__(self, game_mode=GameModes.MENU):
         '''
         Creates a new world object.
         '''
+        GameEngine.load_assets()
         self.game_mode = game_mode
         self.level = 1
 
@@ -392,12 +406,22 @@ class TextBar():
     '''
     Text to visualize the player's stats.
     '''
-    font = pygame.font.SysFont('Futura', 30)
+
+    font = None
+
+    @classmethod
+    def load_assets(cls):
+        '''
+        Preload font renderer into shared memory for reuse.
+        '''
+        if cls.font is None:
+            cls.font = pygame.font.SysFont('Futura', 30)
 
     def __init__(self, x, y, color):
         '''
         Initializes a status bar with the starting value.
         '''
+        TextBar.load_assets()
         self.x, self.y = x, y
         self.color = color
 

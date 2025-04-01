@@ -19,7 +19,9 @@ class Soldier(pygame.sprite.Sprite):
 
     @classmethod
     def load_assets(cls, base_dirpath, soldier_type):
-        """Preload animations and sounds into shared memory for reuse."""
+        '''
+        Preload animations and sounds into shared memory for reuse.
+        '''
         if soldier_type not in cls.animations:
             cls.animations[soldier_type] = cls._load_animations(base_dirpath)
             
@@ -30,11 +32,11 @@ class Soldier(pygame.sprite.Sprite):
     @staticmethod
     def _load_animations(base_dirpath):
         '''
-        Generates an ordered list of animation frames containing every image in a
-        file directory. There are four different animation types and the animation
-        sequence for each must be in an appropriately named subdirectory: 'Idle',
-        'Run', 'Jump', and 'Death'. The images must be named 1.png, 2.png, 3.png,
-        etc. There is no restriction on the number of images in the sequence.
+        Generates an ordered list of animation frames containing every image 
+        within a file directory. There are four different animation types, each
+        in an appropriately named subdirectory: 'Idle', 'Run', 'Jump', and
+        'Death'. The images must be named 1.png, 2.png, 3.png, etc. There is no
+        restriction on the number of images in the animation sequence.
         '''
 
         animation_images = []

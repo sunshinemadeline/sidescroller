@@ -1,22 +1,19 @@
 
-# Initialize the display and sound before importing any other modules
 import pygame
+from controller import GameController
+from widgets import GameButton, GameFade, FadeType
+from engine import GameEngine, GameModes
 from settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, COLOR
+
+# Create IO devices:
+#  1) graphic display for output
+#  2) controller for input
+#  3) the main game engine
+#  4) a clock to keep time
 pygame.init()
 pygame.mixer.init()
 pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Shooter')
-
-# Now import the other modules, which may depend on the mixer and display
-from controller import GameController
-from widgets import GameButton, GameFade, FadeType
-from engine import GameEngine, GameModes
-
-# Create IO devices:
-#  1) controller for input
-#  2) graphic display for output
-#  3) a clock to keep time
-#  4) a font to write text
 controller = GameController()
 engine = GameEngine()
 screen = pygame.display.get_surface()
