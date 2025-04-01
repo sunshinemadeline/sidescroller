@@ -7,8 +7,7 @@ from pygame.sprite import Group
 from pygame.image import load
 from pygame.draw import rect
 from os.path import exists
-from enum import Enum
-from soldier import Player, Enemy, Action
+from soldier import Player, Enemy
 from weapons import ItemBox, Explosion
 from settings import (SCREEN_HEIGHT, SCREEN_WIDTH, SCROLL_RIGHT, SCROLL_LEFT,
                       ENVIRONMENT, TILEMAP, COLOR, Direction, GameModes)
@@ -30,14 +29,15 @@ class GameEngine():
     tile_img_list = None
 
     @classmethod
-    def load_assets(cls):
+    def load_assets(cls, headless):
         '''
         Preload sounds and background images into shared memory for reuse.
-        '''        
+        '''
         # Intialize background music
-        pygame.mixer.music.load('audio/music.mp3')
-        pygame.mixer.music.set_volume(0.3)
-        pygame.mixer.music.play(-1, 0.0, 2500)
+        if not headless:
+            pygame.mixer.music.load('audio/music.mp3')
+            pygame.mixer.music.set_volume(0.3)
+            pygame.mixer.music.play(-1, 0.0, 2500)
 
         # Load all of the background images
         if cls.bg_img is None:
@@ -54,7 +54,7 @@ class GameEngine():
                 SCREEN_HEIGHT - cls.bg_img[1].get_height() - 200,
                 SCREEN_HEIGHT - cls.bg_img[2].get_height() - 150,
                 SCREEN_HEIGHT - cls.bg_img[3].get_height()
-            ]            
+            ]
         
         # Load all possible foreground tiles
         if cls.tile_img_list is None:
@@ -62,16 +62,18 @@ class GameEngine():
             for tile_num in range(TILEMAP.TILE_TYPE_COUNT):
                 img = load(f'img/tile/{tile_num}.png').convert_alpha()
                 img = scale(img, (TILEMAP.TILE_SIZE, TILEMAP.TILE_SIZE))
-                cls.tile_img_list.append(img)        
+                cls.tile_img_list.append(img)
 
 
-    def __init__(self, game_mode=GameModes.MENU):
+    def __init__(self, screen=None, game_mode=GameModes.MENU):
         '''
         Creates a new world object.
         '''
-        GameEngine.load_assets()
         self.game_mode = game_mode
         self.level = 1
+        self.screen = screen
+        GameEngine.load_assets(True if screen is None else False)
+
 
     def reset_world(self):
         ''' 
@@ -87,6 +89,7 @@ class GameEngine():
         self.group_names = [ 'obstacle', 'water', 'decoration', 'exit', 'item',
                              'enemy', 'bullet', 'grenade', 'explosion' ]
         self.groups = { group:Group() for group in self.group_names }
+
 
     def load_game_tile(self, tile, idx_x, idx_y):
         '''
@@ -134,6 +137,7 @@ class GameEngine():
             exit_tile = GameTile(img, rect.x, rect.y)
             self.groups['exit'].add(exit_tile)
 
+
     def load_next_level(self):
         '''
         Advances Player to the next level.
@@ -144,6 +148,7 @@ class GameEngine():
         else:
             print(f'Error: level {self.level} does not exist')
             self.game_mode = GameModes.QUIT
+
 
     def load_current_level(self) -> Player:
         '''
@@ -167,6 +172,7 @@ class GameEngine():
                 if tile >= 0: # -1 is an empty space
                     self.load_game_tile(tile, idx_x, idx_y)
     
+
     def player_actions(self, controller):
         '''
         Handles possible player actions based on the buttons that are pressed
@@ -185,6 +191,7 @@ class GameEngine():
             if grenade:
                 self.groups['grenade'].add(grenade)
 
+
     def enemy_actions(self):
         '''
         Handle AI behavior for all enemies.
@@ -198,7 +205,8 @@ class GameEngine():
                         self.groups['bullet'].add(bullet)
                 enemy.ai_move(self.world_data, TILEMAP.TILE_SIZE)
                 if enemy.health <= 0:
-                    enemy.death()               
+                    enemy.death()
+
 
     def collect_item_boxes(self):
         ''' 
@@ -215,6 +223,7 @@ class GameEngine():
                 amount = self.player.health + item.quantity
                 self.player.health = min(amount, self.player.max_health)
     
+
     def handle_bullet_damage(self):
         '''
         Check for bullet hit damage and injure Soldier accordingly.
@@ -226,7 +235,8 @@ class GameEngine():
                 if enemy.health >= 0:
                     enemy.health -= bullet.damage
                     bullet.kill()
-    
+
+
     def make_grenades_explode(self):
         '''
         Check for exploding grenades and initiate animation.
@@ -241,6 +251,7 @@ class GameEngine():
                     enemy.health -= grenade.damage_at(enemy.rect)
                 grenade.kill()
     
+
     def check_for_player_death(self):
         '''
         Determines if the player has died and updates object accordingly.
@@ -248,14 +259,16 @@ class GameEngine():
         if (self.player.health <= 0 
                 or self.player.rect.top > SCREEN_HEIGHT
                 or spritecollide(self.player, self.groups['water'], False)):
-            self.player.death()      
+            self.player.death()
+
 
     def check_if_level_exit(self):
         '''
         Determines if the player has finished the current level.
         '''
         if spritecollide(self.player, self.groups['exit'], False):
-            self.level_complete = True          
+            self.level_complete = True
+
 
     def shift_camera(self):
         '''
@@ -271,6 +284,7 @@ class GameEngine():
                 and self.bg_scroll > 0)):
             self.camera_scroll -= self.player.dx
             self.bg_scroll += self.player.dx
+
 
     def apply_physics(self, sprite):
         '''
@@ -316,6 +330,7 @@ class GameEngine():
         sprite.rect.x += sprite.dx
         sprite.rect.y += sprite.dy
 
+
     def update(self, controller):
         '''
         Updates the world environment based on any buttons pressed on the
@@ -351,7 +366,8 @@ class GameEngine():
         self.check_for_player_death()
         self.check_if_level_exit()
 
-    def draw(self, screen):
+
+    def draw(self):
         '''
         Blits all of the sprites in the entire world onto the screen.
         '''
@@ -368,18 +384,18 @@ class GameEngine():
                 bg_y = int(GameEngine.bg_ypos[idx])
                 bg_x = int((copy_num * GameEngine.bg_width)
                            - self.bg_scroll * (0.5 + idx * 0.1))
-                screen.blit(bg_img, (bg_x, bg_y))
+                self.screen.blit(bg_img, (bg_x, bg_y))
 
         # Draw the world one tile at a time
         for group in self.group_names:
             for sprite in self.groups[group]:
-                sprite.draw(screen, self.camera_scroll)
-        self.player.draw(screen, self.camera_scroll)
+                sprite.draw(self.screen, self.camera_scroll)
+        self.player.draw(self.screen, self.camera_scroll)
 
         # Draw the status bars
-        self.health_bar.draw(screen, self.player.health)
-        self.grenade_bar.draw(screen, f'GRENADES: {self.player.grenades}')
-        self.ammo_bar.draw(screen, f'ROUNDS: {self.player.ammo}')
+        self.health_bar.draw(self.screen, self.player.health)
+        self.grenade_bar.draw(self.screen, f'GRENADES: {self.player.grenades}')
+        self.ammo_bar.draw(self.screen, f'ROUNDS: {self.player.ammo}')
 
 
 class GameTile(pygame.sprite.Sprite):
@@ -389,7 +405,7 @@ class GameTile(pygame.sprite.Sprite):
     def __init__(self, img, x, y):
         '''
         Initializes the look and position of a game tile.
-        '''        
+        '''
         super().__init__()
         self.image = img
         self.rect = self.image.get_rect()
@@ -398,7 +414,7 @@ class GameTile(pygame.sprite.Sprite):
     def draw(self, screen, screen_scroll):
         '''
         Draws the game tile to the given screen surface.
-        '''        
+        '''
         screen.blit(self.image, (self.rect.x + screen_scroll, self.rect.y))
 
 

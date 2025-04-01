@@ -14,9 +14,9 @@ pygame.init()
 pygame.mixer.init()
 pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Shooter')
-controller = GameController()
-engine = GameEngine()
 screen = pygame.display.get_surface()
+controller = GameController()
+engine = GameEngine(screen)
 clock = pygame.time.Clock()
 
 
@@ -100,7 +100,7 @@ def run_interactive_game(engine: GameEngine,
 
     # Update the position of all physics-controlled sprites
     engine.update(controller)
-    engine.draw(screen)
+    engine.draw()
 
     # Special case #1: begin a new level
     if not intro_fade.finished:
